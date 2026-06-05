@@ -2,11 +2,29 @@
 
 namespace DuckRace\Services;
 
+use DuckRace\Audit\Logger;
 use DuckRace\Database\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
 class ContactService {
+
+    public function touch_last_purchase( int $contact_id ): void {
+        if ( $contact_id <= 0 ) {
+            return;
+        }
+
+        global $wpdb;
+        $table = Schema::table_name( 'contacts' );
+        $wpdb->update(
+            $table,
+            [
+                'last_purchase_at' => current_time( 'mysql', true ),
+                'updated_at' => current_time( 'mysql', true ),
+            ],
+            [ 'id' => $contact_id ]
+        );
+    }
 
     public function find_by_email( string $email ): ?object {
         $email = strtolower( sanitize_email( $email ) );
@@ -59,13 +77,64 @@ class ContactService {
         $existing = $this->find_by_email( $email );
 
         if ( $existing ) {
+            $before = $this->snapshot( (array) $existing );
             $wpdb->update( $table, $clean, [ 'id' => (int) $existing->id ] );
+
+            $after = $this->snapshot( array_merge( (array) $existing, $clean ) );
+            Logger::log(
+                'contact.updated',
+                'contact',
+                (int) $existing->id,
+                $before,
+                $after,
+                [
+                    'consent_timestamp' => (string) ( $clean['consent_timestamp'] ?? '' ),
+                    'consent_source' => (string) ( $clean['consent_source'] ?? '' ),
+                ]
+            );
+
             return (int) $existing->id;
         }
 
         $clean['created_at'] = $clean['updated_at'];
         $wpdb->insert( $table, $clean );
 
-        return (int) $wpdb->insert_id;
+        $new_id = (int) $wpdb->insert_id;
+        Logger::log(
+            'contact.created',
+            'contact',
+            $new_id,
+            null,
+            $this->snapshot( $clean ),
+            [
+                'consent_timestamp' => (string) ( $clean['consent_timestamp'] ?? '' ),
+                'consent_source' => (string) ( $clean['consent_source'] ?? '' ),
+            ]
+        );
+
+        return $new_id;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function snapshot( array $row ): array {
+        return [
+            'first_name' => (string) ( $row['first_name'] ?? '' ),
+            'last_name' => (string) ( $row['last_name'] ?? '' ),
+            'organisation_name' => (string) ( $row['organisation_name'] ?? '' ),
+            'email' => (string) ( $row['email'] ?? '' ),
+            'phone' => (string) ( $row['phone'] ?? '' ),
+            'address_line_1' => (string) ( $row['address_line_1'] ?? '' ),
+            'address_line_2' => (string) ( $row['address_line_2'] ?? '' ),
+            'city' => (string) ( $row['city'] ?? '' ),
+            'postcode' => (string) ( $row['postcode'] ?? '' ),
+            'country' => (string) ( $row['country'] ?? '' ),
+            'consent_duck_race' => (int) ( $row['consent_duck_race'] ?? 0 ),
+            'consent_organisation' => (int) ( $row['consent_organisation'] ?? 0 ),
+            'consent_timestamp' => (string) ( $row['consent_timestamp'] ?? '' ),
+            'consent_source' => (string) ( $row['consent_source'] ?? '' ),
+        ];
     }
 }

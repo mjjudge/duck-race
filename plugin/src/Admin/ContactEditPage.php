@@ -20,6 +20,7 @@ class ContactEditPage {
         RequestGuard::require_capability( 'duck_race_manage_contacts' );
 
         $contact = $this->load_contact();
+        $audit_events = ( ! empty( $contact['id'] ) ) ? $this->load_recent_audit_events( (int) $contact['id'] ) : [];
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__( 'Edit Contact', 'duck-race' ) . '</h1>';
@@ -49,6 +50,28 @@ class ContactEditPage {
 
         submit_button( __( 'Save Contact', 'duck-race' ) );
         echo '</form>';
+
+        if ( ! empty( $audit_events ) ) {
+            echo '<h2>' . esc_html__( 'Recent Audit History', 'duck-race' ) . '</h2>';
+            echo '<table class="widefat striped"><thead><tr>';
+            echo '<th>' . esc_html__( 'When', 'duck-race' ) . '</th>';
+            echo '<th>' . esc_html__( 'Event', 'duck-race' ) . '</th>';
+            echo '<th>' . esc_html__( 'Before', 'duck-race' ) . '</th>';
+            echo '<th>' . esc_html__( 'After', 'duck-race' ) . '</th>';
+            echo '</tr></thead><tbody>';
+
+            foreach ( $audit_events as $event ) {
+                echo '<tr>';
+                echo '<td>' . esc_html( (string) $event->created_at ) . '</td>';
+                echo '<td>' . esc_html( (string) $event->event_type ) . '</td>';
+                echo '<td><pre style="white-space:pre-wrap;">' . esc_html( (string) $event->before_json ) . '</pre></td>';
+                echo '<td><pre style="white-space:pre-wrap;">' . esc_html( (string) $event->after_json ) . '</pre></td>';
+                echo '</tr>';
+            }
+
+            echo '</tbody></table>';
+        }
+
         echo '</div>';
     }
 
@@ -116,6 +139,33 @@ class ContactEditPage {
         $row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $contact_id ), ARRAY_A );
 
         return is_array( $row ) ? $row : [];
+    }
+
+    /**
+     * @return array<int, object>
+     */
+    private function load_recent_audit_events( int $contact_id ): array {
+        global $wpdb;
+
+        $table = Schema::table_name( 'audit_log' );
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+        if ( $exists !== $table ) {
+            return [];
+        }
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT event_type, before_json, after_json, created_at
+                 FROM {$table}
+                 WHERE entity_type = %s AND entity_id = %d
+                 ORDER BY id DESC
+                 LIMIT 10",
+                'contact',
+                $contact_id
+            )
+        );
+
+        return is_array( $rows ) ? $rows : [];
     }
 
     private function text_row( string $name, string $label, string $value, string $type = 'text' ): void {

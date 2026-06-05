@@ -306,6 +306,8 @@ Dependencies
 DR-011.
 
 DR-016 — Create email log table
+Status
+    • [x] Complete
 Acceptance Criteria
     • Logs recipient, email type, race, purchase, status and errors.
     • Can be used for resend/debugging.
@@ -313,6 +315,8 @@ Dependencies
 DR-011, DR-012, DR-013.
 
 DR-017 — Create audit log table
+Status
+    • [x] Complete
 Acceptance Criteria
     • Records important admin and contact update actions.
     • Stores before/after JSON where appropriate.
@@ -415,6 +419,8 @@ Dependencies
 DR-012.
 
 DR-041 — Add contact update audit trail
+Status
+    • [x] Complete
 Acceptance Criteria
     • Name/address/phone changes are recorded in audit log.
     • Consent changes are recorded with timestamp and source.
@@ -423,6 +429,8 @@ Dependencies
 DR-017, DR-040.
 
 DR-042 — Add buyer recognition endpoint
+Status
+    • [x] Complete
 Acceptance Criteria
     • Public purchase form can check whether an email already exists.
     • Endpoint is available without login.
@@ -446,6 +454,8 @@ DR-040.
 
 EPIC 6 — Manual Sales
 DR-050 — Create manual sale form
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can select race.
     • Admin can enter buyer details.
@@ -456,6 +466,8 @@ Dependencies
 DR-031, DR-040.
 
 DR-051 — Manual duck allocation
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can allocate next available manual-range ducks.
     • Admin can choose specific available manual-range duck numbers.
@@ -465,6 +477,8 @@ Dependencies
 DR-014, DR-015, DR-050.
 
 DR-052 — Record manual payment details
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can record cash, card machine, bank transfer or other.
     • Admin can record amount paid.
@@ -475,6 +489,8 @@ DR-013, DR-050.
 
 EPIC 7 — Public Online Sales
 DR-060 — Create [duck_race_buy] shortcode
+Status
+    • [x] Complete
 Acceptance Criteria
     • Shortcode can show current race or specified race slug.
     • Form displays race details.
@@ -484,6 +500,8 @@ Dependencies
 DR-031.
 
 DR-061 — Add online allocation service
+Status
+    • [x] Complete
 Acceptance Criteria
     • Automatically allocates next available online-range ducks.
     • Excludes sold, reserved and lost ducks.
@@ -493,6 +511,8 @@ Dependencies
 DR-014, DR-015.
 
 DR-062 — Add chosen-number option
+Status
+    • [x] Complete
 Acceptance Criteria
     • Buyer can search/check online-range duck availability.
     • Buyer can choose available online duck number.
@@ -502,6 +522,8 @@ Dependencies
 DR-061.
 
 DR-063 — Add buyer details and consent section
+Status
+    • [x] Complete
 Acceptance Criteria
     • Buyer enters required contact details.
     • Email field can trigger buyer recognition before checkout.
@@ -515,6 +537,8 @@ DR-040, DR-060.
 
 EPIC 8 — Stripe Integration
 DR-070 — Add Stripe settings
+Status
+    • [x] Complete
 Acceptance Criteria
     • Settings Admin can enter publishable key, secret key and webhook secret.
     • Secret values are masked after saving.
@@ -523,6 +547,8 @@ Dependencies
 DR-022.
 
 DR-071 — Create Stripe Checkout session
+Status
+    • [x] Complete
 Acceptance Criteria
     • Online purchase creates pending purchase.
     • Duck numbers are reserved before checkout.
@@ -532,6 +558,8 @@ Dependencies
 DR-061, DR-063, DR-070.
 
 DR-072 — Add Stripe webhook handler
+Status
+    • [x] Complete
 Acceptance Criteria
     • Webhook validates Stripe signature.
     • Successful payment marks purchase paid.
@@ -541,6 +569,8 @@ Dependencies
 DR-071.
 
 DR-073 — Add success and failure pages
+Status
+    • [x] Complete
 Acceptance Criteria
     • Success page thanks buyer and explains email confirmation.
     • Failure/cancel page explains that ducks are not confirmed.
@@ -550,6 +580,8 @@ DR-072.
 
 EPIC 9 — Email Engine
 DR-080 — Create email template renderer
+Status
+    • [x] Complete
 Acceptance Criteria
     • Supports merge tags for race, buyer, purchase and ducks.
     • Escapes output safely.
@@ -558,6 +590,8 @@ Dependencies
 DR-016.
 
 DR-081 — Create purchase confirmation email
+Status
+    • [x] Complete
 Acceptance Criteria
     • Sent after successful Stripe webhook or confirmed manual sale.
     • Includes duck numbers, duck names, race details and total paid.
@@ -567,6 +601,8 @@ Dependencies
 DR-080, DR-072.
 
 DR-082 — Add admin email settings
+Status
+    • [x] Complete
 Acceptance Criteria
     • Settings Admin can edit default email text.
     • Organisation logo/branding can be included.
@@ -575,6 +611,8 @@ Dependencies
 DR-080.
 
 DR-083 — Add race reminder email
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can send reminder to current race participants.
     • Reminder is operational and does not require marketing opt-in.
@@ -584,6 +622,8 @@ DR-080, DR-081.
 
 EPIC 10 — Winner Management
 DR-090 — Configure winner positions
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can configure 1st, 2nd, 3rd and additional positions.
     • Each position can have optional prize label.
@@ -592,6 +632,8 @@ Dependencies
 DR-031.
 
 DR-091 — Record winning ducks
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can assign duck numbers to winner positions.
     • System links winners to buyer/contact.
@@ -601,6 +643,8 @@ Dependencies
 DR-014, DR-090.
 
 DR-092 — Create [duck_race_winners] shortcode
+Status
+    • [x] Complete
 Acceptance Criteria
     • Displays winner names/business names only.
     • Does not display contact details.
@@ -611,6 +655,8 @@ DR-091.
 
 EPIC 11 — GDPR and Retention
 DR-100 — Add retention settings
+Status
+    • [x] Complete
 Acceptance Criteria
     • Settings Admin can configure non-opt-in retention period.
     • Default is configurable.
@@ -619,6 +665,8 @@ Dependencies
 DR-022.
 
 DR-101 — Add anonymisation service
+Status
+    • [x] Complete
 Acceptance Criteria
     • Non-opt-in contacts can be anonymised after race retention period.
     • Financial/race records are preserved with minimised personal data.
@@ -627,6 +675,8 @@ Dependencies
 DR-040, DR-100.
 
 DR-102 — Add scheduled retention job
+Status
+    • [x] Complete
 Acceptance Criteria
     • WP-Cron checks for records eligible for anonymisation.
     • Job is safe to rerun.

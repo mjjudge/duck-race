@@ -217,6 +217,25 @@ Never display:
 Reason:
 Privacy and GDPR compliance.
 
+Winner Configuration And Recording
+Decision:
+Winner positions are configured per race and always include at least 1st, 2nd and 3rd.
+Additional positions are allowed and may have optional prize labels.
+Assigning winners updates duck entries to winner status and stores winner position and prize label.
+Winner updates are audit logged so mistakes can be corrected without losing traceability.
+Reason:
+Supports flexible race prize structures while preserving auditable historical winner records.
+
+GDPR Retention And Anonymisation Workflow
+Decision:
+Contacts without duck-race or organisation consent are anonymised after a configurable retention period.
+Retention is configured in days in settings and defaults to 365 days.
+Anonymisation runs daily via WP-Cron and can be manually triggered from settings.
+Anonymisation removes personal profile fields while preserving contact ID, email key, purchase, entry and financial records.
+All anonymisation actions are audit logged.
+Reason:
+Supports GDPR data minimisation while preserving financial and historical reporting integrity.
+
 UI Decisions
 Visual Duck Grid
 Status:
@@ -256,6 +275,17 @@ Improves user experience.
 Keeps contact records current.
 Reduces data entry.
 No login required.
+
+Email Engine And Operational Messaging
+Decision:
+Email sends are logged in an email log table with recipient, type, race, purchase and status.
+Purchase confirmations are operational emails and are sent after:
+    • confirmed manual paid sales
+    • successful Stripe webhook paid transitions
+Race reminders are operational emails for participants in the relevant race and do not require marketing opt-in.
+Reason:
+Supports auditability and resend/debugging.
+Separates operational obligations from marketing consent.
 
 MVP Boundary
 A race can be run successfully when the following are available:

@@ -19,6 +19,9 @@ class Migrator {
         '0.4.0' => Migrations\CreatePurchasesTable::class,
         '0.5.0' => Migrations\CreateDuckEntriesTable::class,
         '0.6.0' => Migrations\CreateDuckStatusTable::class,
+        '0.7.0' => Migrations\CreateAuditLogTable::class,
+        '0.8.0' => Migrations\CreateEmailLogTable::class,
+        '0.9.0' => Migrations\CreateWinnerPositionsTable::class,
     ];
 
     public function run(): void {
