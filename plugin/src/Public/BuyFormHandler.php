@@ -23,13 +23,14 @@ class BuyFormHandler {
 
         ob_start();
         ?>
-        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="duck-race-buy-form" data-check-email-url="<?php echo esc_url( rest_url( 'duck-race/v1/check-email' ) ); ?>">
+        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="duck-race-buy-form" data-check-email-url="<?php echo esc_url( rest_url( 'duck-race/v1/check-email' ) ); ?>" aria-describedby="duck-race-form-help">
             <input type="hidden" name="action" value="duck_race_start_checkout" />
             <?php wp_nonce_field( self::NONCE_ACTION, 'duck_race_nonce' ); ?>
             <input type="hidden" name="race_id" value="<?php echo esc_attr( (string) $race->id ); ?>" />
 
             <h3><?php echo esc_html( (string) $race->title ); ?></h3>
             <p><?php echo esc_html( (string) $race->location ); ?> | <?php echo esc_html( (string) $race->race_date ); ?></p>
+            <p id="duck-race-form-help"><?php esc_html_e( 'All required fields must be completed before checkout. Validation errors are shown below the relevant field.', 'duck-race' ); ?></p>
 
             <p>
                 <label for="duck-race-duck-count"><?php esc_html_e( 'Number of ducks', 'duck-race' ); ?></label>
@@ -52,7 +53,7 @@ class BuyFormHandler {
                 <input id="duck-race-email" type="email" name="email" required />
             </p>
 
-            <div id="duck-race-recognition" style="display:none;"></div>
+            <div id="duck-race-recognition" role="status" aria-live="polite" style="display:none;"></div>
 
             <p>
                 <label for="duck-race-first-name"><?php esc_html_e( 'First name', 'duck-race' ); ?></label>
@@ -64,10 +65,13 @@ class BuyFormHandler {
                 <input id="duck-race-last-name" type="text" name="last_name" required />
             </p>
 
-            <p>
-                <label><input type="checkbox" name="consent_duck_race" value="1" /> <?php esc_html_e( 'Contact me about future duck races', 'duck-race' ); ?></label><br />
-                <label><input type="checkbox" name="consent_organisation" value="1" /> <?php esc_html_e( 'Contact me about other organisation activities', 'duck-race' ); ?></label>
-            </p>
+            <fieldset>
+                <legend><?php esc_html_e( 'Communication preferences', 'duck-race' ); ?></legend>
+                <p>
+                    <label><input type="checkbox" name="consent_duck_race" value="1" /> <?php esc_html_e( 'Contact me about future duck races', 'duck-race' ); ?></label><br />
+                    <label><input type="checkbox" name="consent_organisation" value="1" /> <?php esc_html_e( 'Contact me about other organisation activities', 'duck-race' ); ?></label>
+                </p>
+            </fieldset>
 
             <p style="display:none;" aria-hidden="true">
                 <label for="duck-race-website"><?php esc_html_e( 'Website', 'duck-race' ); ?></label>
@@ -89,6 +93,23 @@ class BuyFormHandler {
             const endpoint = form.getAttribute('data-check-email-url');
 
             if (!emailEl || !endpoint) return;
+
+            const requiredFields = [
+                form.querySelector('#duck-race-duck-count'),
+                form.querySelector('#duck-race-email'),
+                form.querySelector('#duck-race-first-name'),
+                form.querySelector('#duck-race-last-name')
+            ].filter(Boolean);
+
+            requiredFields.forEach((field) => {
+                field.addEventListener('invalid', () => {
+                    field.setAttribute('aria-invalid', 'true');
+                });
+                field.addEventListener('input', () => {
+                    field.removeAttribute('aria-invalid');
+                    field.setCustomValidity('');
+                });
+            });
 
             emailEl.addEventListener('blur', async () => {
                 const email = emailEl.value.trim();

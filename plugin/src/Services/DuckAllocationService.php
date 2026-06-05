@@ -15,10 +15,10 @@ class DuckAllocationService {
 
         $available = [];
         for ( $number = $start; $number <= $end; $number++ ) {
-            if ( $this->is_lost( (int) $race->id, $number ) ) {
+            if ( $this->is_lost_for_test( (int) $race->id, $number ) ) {
                 continue;
             }
-            if ( $this->is_taken( (int) $race->id, $number ) ) {
+            if ( $this->is_taken_for_test( (int) $race->id, $number ) ) {
                 continue;
             }
 
@@ -37,11 +37,11 @@ class DuckAllocationService {
             return false;
         }
 
-        if ( $this->is_lost( (int) $race->id, $duck_number ) ) {
+        if ( $this->is_lost_for_test( (int) $race->id, $duck_number ) ) {
             return false;
         }
 
-        return ! $this->is_taken( (int) $race->id, $duck_number );
+        return ! $this->is_taken_for_test( (int) $race->id, $duck_number );
     }
 
     public function validate_manual_number( object $race, int $duck_number ): array {
@@ -50,18 +50,18 @@ class DuckAllocationService {
             return [ false, __( 'Selected duck is outside the manual range.', 'duck-race' ) ];
         }
 
-        if ( $this->is_lost( (int) $race->id, $duck_number ) ) {
+        if ( $this->is_lost_for_test( (int) $race->id, $duck_number ) ) {
             return [ false, __( 'Selected duck is marked unavailable/lost.', 'duck-race' ) ];
         }
 
-        if ( $this->is_taken( (int) $race->id, $duck_number ) ) {
+        if ( $this->is_taken_for_test( (int) $race->id, $duck_number ) ) {
             return [ false, __( 'Selected duck is already sold or reserved.', 'duck-race' ) ];
         }
 
         return [ true, '' ];
     }
 
-    private function is_lost( int $race_id, int $duck_number ): bool {
+    protected function is_lost_for_test( int $race_id, int $duck_number ): bool {
         global $wpdb;
         $table = Schema::table_name( 'duck_status' );
         $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
@@ -80,7 +80,7 @@ class DuckAllocationService {
         return is_string( $status ) && 'lost' === $status;
     }
 
-    private function is_taken( int $race_id, int $duck_number ): bool {
+    protected function is_taken_for_test( int $race_id, int $duck_number ): bool {
         global $wpdb;
         $table = Schema::table_name( 'entries' );
         $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );

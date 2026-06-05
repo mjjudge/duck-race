@@ -824,6 +824,8 @@ DR-082.
 
 EPIC 16 — Production Hardening
 DR-150 — Add automated tests for allocation
+Status
+    • [x] Complete
 Acceptance Criteria
     • Tests cover automatic allocation.
     • Tests cover chosen number allocation.
@@ -833,6 +835,8 @@ Dependencies
 DR-061, DR-062.
 
 DR-151 — Add Stripe webhook tests
+Status
+    • [x] Complete
 Acceptance Criteria
     • Tests cover successful payment.
     • Tests cover failed payment.
@@ -842,6 +846,8 @@ Dependencies
 DR-072.
 
 DR-152 — Add accessibility pass
+Status
+    • [x] Complete
 Acceptance Criteria
     • Public form is keyboard usable.
     • Labels are correctly associated.
@@ -851,6 +857,8 @@ Dependencies
 DR-060, DR-120.
 
 DR-153 — Add uninstall behaviour
+Status
+    • [x] Complete
 Acceptance Criteria
     • Plugin does not delete data on deactivation.
     • Uninstall flow is explicit.
@@ -860,6 +868,8 @@ Dependencies
 DR-010.
 
 DR-154 — Write admin documentation
+Status
+    • [x] Complete
 Acceptance Criteria
     • Explains race setup.
     • Explains manual sales.

@@ -429,11 +429,22 @@ Requirements include:
 - Secure option storage for Stripe secrets
 - Secret masking in UI
 - Stripe webhook signature validation
+- Idempotent webhook handling for duplicate deliveries
 - Database-level protection against double allocation
 - Logging of important admin actions
 - No personal data leakage through public shortcodes or REST endpoints
+- Explicit uninstall behavior where data deletion is opt-in only via admin confirmation
 
-## 15. Technical Architecture
+## 15. Accessibility Baseline
+
+Public participant journeys must satisfy a practical accessibility baseline:
+
+- Keyboard-usable purchase form controls
+- Correct label association for all required form fields
+- Readable, text-based status and validation messaging
+- Status not conveyed by colour alone in operational UIs
+
+## 16. Technical Architecture
 
 Suggested structure:
 
@@ -492,13 +503,13 @@ duck-race/
   MEMORY.md
 ```
 
-## 16. Front-End Behaviour
+## 17. Front-End Behaviour
 
 The purchase form should support adding and removing ducks, optional naming, optional chosen-number search, price breakdown, uplift display, grand total, buyer validation, clear GDPR consent text and Stripe Checkout redirection.
 
 Use progressive enhancement wherever practical.
 
-## 17. Admin Duck Grid Behaviour
+## 18. Admin Duck Grid Behaviour
 
 The duck grid is a v1.1-quality feature that should support:
 
@@ -517,7 +528,7 @@ Recommended tile states:
 - Reserved/pending: muted blue or grey
 - Winner: gold
 
-## 18. MVP Boundary
+## 19. MVP Boundary
 
 MVP includes:
 
@@ -538,7 +549,7 @@ MVP includes:
 
 Post-MVP or v1.1 can extend this with the full duck grid, rich email editing, campaign flows, imports, abandoned checkout automation, enhanced audit logging and better reporting.
 
-## 19. Acceptance Criteria
+## 20. Acceptance Criteria
 
 Acceptance criteria cover:
 
@@ -550,7 +561,7 @@ Acceptance criteria cover:
 - Operational and marketing email rules
 - Security requirements, including webhook validation and prevention of double-selling
 
-## 20. Open Decisions
+## 21. Open Decisions
 
 Open decisions include defaults for price, uplift, max ducks per transaction, retention period, required address or phone fields, manual confirmation email behaviour, public duck number visibility, imported-contact opt-in policy and whether styling is theme-inherited or bundled.
 

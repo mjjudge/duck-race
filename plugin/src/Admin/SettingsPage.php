@@ -38,6 +38,7 @@ class SettingsPage {
         $reminder_body = (string) ( $settings['email_race_reminder_body'] ?? '' );
         $test_email_to = (string) ( $settings['email_test_recipient'] ?? $contact_email );
         $retention_days = (int) ( $settings['retention_non_opt_in_days'] ?? 365 );
+        $confirm_uninstall_data_removal = ! empty( $settings['confirm_uninstall_data_removal'] );
         $retention_last_run_at = (string) get_option( 'duck_race_retention_last_run_at', '' );
         $retention_last_run_count = (int) get_option( 'duck_race_retention_last_run_count', 0 );
 
@@ -130,6 +131,14 @@ class SettingsPage {
         echo '</tr>';
 
         echo '<tr>';
+        echo '<th scope="row"><label for="confirm_uninstall_data_removal">' . esc_html__( 'Destructive uninstall', 'duck-race' ) . '</label></th>';
+        echo '<td>';
+        echo '<label><input name="confirm_uninstall_data_removal" id="confirm_uninstall_data_removal" type="checkbox" value="1" ' . checked( $confirm_uninstall_data_removal, true, false ) . ' /> ' . esc_html__( 'I confirm plugin data may be deleted on uninstall.', 'duck-race' ) . '</label>';
+        echo '<p class="description">' . esc_html__( 'Deactivation never deletes data. Uninstall deletion only occurs when this setting is enabled.', 'duck-race' ) . '</p>';
+        echo '</td>';
+        echo '</tr>';
+
+        echo '<tr>';
         echo '<th scope="row">' . esc_html__( 'Available merge tags', 'duck-race' ) . '</th>';
         echo '<td><code>{first_name}</code> <code>{last_name}</code> <code>{organisation_name}</code> <code>{race_title}</code> <code>{race_date}</code> <code>{race_time}</code> <code>{race_location}</code> <code>{duck_numbers}</code> <code>{duck_names}</code> <code>{purchase_total}</code> <code>{buy_link}</code> <code>{previous_race_result}</code> <code>{winner_position}</code></td>';
         echo '</tr>';
@@ -156,6 +165,9 @@ class SettingsPage {
         wp_nonce_field( self::RETENTION_NONCE_ACTION, '_wpnonce' );
         submit_button( __( 'Run Retention Now', 'duck-race' ), 'secondary', 'submit', false );
         echo '</form>';
+        echo '<hr />';
+        echo '<h2>' . esc_html__( 'Documentation', 'duck-race' ) . '</h2>';
+        echo '<p>' . esc_html__( 'See docs/ADMIN_GUIDE.md in this repository for setup and operating guidance.', 'duck-race' ) . '</p>';
         echo '</div>';
     }
 
@@ -176,6 +188,7 @@ class SettingsPage {
         $reminder_subject = sanitize_text_field( wp_unslash( $_POST['email_race_reminder_subject'] ?? '' ) );
         $reminder_body = wp_kses_post( wp_unslash( $_POST['email_race_reminder_body'] ?? '' ) );
         $retention_days = max( 30, min( 3650, (int) ( $_POST['retention_non_opt_in_days'] ?? (int) ( $existing['retention_non_opt_in_days'] ?? 365 ) ) ) );
+        $confirm_uninstall_data_removal = isset( $_POST['confirm_uninstall_data_removal'] ) ? 1 : 0;
 
         $secret_key = '' !== $secret_key_input
             ? $secret_key_input
@@ -199,6 +212,7 @@ class SettingsPage {
                 'email_race_reminder_body' => $reminder_body,
                 'email_test_recipient' => sanitize_email( wp_unslash( $_POST['email_test_recipient'] ?? (string) ( $existing['email_test_recipient'] ?? '' ) ) ),
                 'retention_non_opt_in_days' => $retention_days,
+                'confirm_uninstall_data_removal' => $confirm_uninstall_data_removal,
             ],
             false
         );

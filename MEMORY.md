@@ -259,6 +259,16 @@ Lost/restore actions are capability and nonce protected and only allowed where a
 Reason:
 Supports fast race-day administration while preserving security and allocation integrity.
 
+Production Hardening Decisions (EPIC 16)
+Decision:
+Allocation and Stripe webhook behaviors are covered by automated test scripts in `tests/run.php` using lightweight, repository-local unit tests.
+Webhook processing is idempotent for duplicate delivery and differentiates failed payments from expired checkout states.
+Uninstall behavior is explicit and destructive data removal requires an administrator confirmation setting.
+Public buy form accessibility includes explicit field guidance, consent fieldset/legend grouping, and live status messaging for contact recognition.
+Reason:
+Improves operational safety and release confidence without introducing heavy framework dependencies.
+Protects historical and financial records by making destructive uninstall opt-in only.
+
 Campaign Marketing Workflow
 Decision:
 Campaign marketing is managed in a dedicated admin page with nonce/capability protected actions.

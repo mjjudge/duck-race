@@ -3,6 +3,7 @@
 namespace DuckRace\Rest;
 
 use DuckRace\Services\PurchaseService;
+use DuckRace\Services\StripeWebhookProcessor;
 use DuckRace\Services\StripeService;
 
 defined( 'ABSPATH' ) || exit;
@@ -40,25 +41,11 @@ class StripeWebhookRoute {
             return new \WP_REST_Response( [ 'ok' => false, 'error' => 'invalid_payload' ], 400 );
         }
 
-        $event = (string) ( $payload['type'] ?? '' );
-        $object = is_array( $payload['data']['object'] ?? null ) ? $payload['data']['object'] : [];
-        $purchase_id = (int) ( $object['metadata']['purchase_id'] ?? $object['client_reference_id'] ?? 0 );
-
-        if ( $purchase_id <= 0 || '' === $event ) {
-            return new \WP_REST_Response( [ 'ok' => false, 'error' => 'missing_fields' ], 400 );
+        $result = ( new StripeWebhookProcessor() )->process( $payload, new PurchaseService() );
+        if ( ! $result['ok'] ) {
+            return new \WP_REST_Response( [ 'ok' => false, 'error' => (string) ( $result['error'] ?? 'webhook_processing_error' ) ], (int) $result['status'] );
         }
 
-        $purchase_service = new PurchaseService();
-        if ( 'checkout.session.completed' === $event ) {
-            $purchase_service->mark_paid(
-                $purchase_id,
-                (string) ( $object['payment_intent'] ?? '' ),
-                (string) ( $object['payment_intent'] ?? '' )
-            );
-        } elseif ( in_array( $event, [ 'checkout.session.expired', 'payment.failed', 'checkout.session.async_payment_failed' ], true ) ) {
-            $purchase_service->release_reservations( $purchase_id, 'failed' );
-        }
-
-        return new \WP_REST_Response( [ 'ok' => true ], 200 );
+        return new \WP_REST_Response( [ 'ok' => true ], (int) $result['status'] );
     }
 }

@@ -16,7 +16,7 @@ Duck Race supports:
 
 ## Current Status
 
-Planning/bootstrap stage.
+Implementation in progress through hardening phase, including Stripe webhook flow, reporting, retention, campaigns and production safeguards.
 
 Read these first:
 
@@ -70,6 +70,7 @@ The initial MVP is planned to include:
 - `TECHNICAL_SPEC.md` — full product and architecture specification
 - `BACKLOG.md` — phased delivery plan and open work
 - `WORDPRESS_SETUP.md` — WordPress/plugin setup reference adapted from proven TOL patterns
+- `docs/ADMIN_GUIDE.md` — operator guide for race setup and day-to-day administration
 - `AGENTS.md` — agent/operator guidance for working in this repository
 - `CLAUDE.md` — coding-assistant specific working notes
 - `MEMORY.md` — durable project context and decisions
