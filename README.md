@@ -69,26 +69,47 @@ The initial MVP is planned to include:
 - `README.md` — project overview and onboarding entry point
 - `TECHNICAL_SPEC.md` — full product and architecture specification
 - `BACKLOG.md` — phased delivery plan and open work
+- `WORDPRESS_SETUP.md` — WordPress/plugin setup reference adapted from proven TOL patterns
 - `AGENTS.md` — agent/operator guidance for working in this repository
 - `CLAUDE.md` — coding-assistant specific working notes
 - `MEMORY.md` — durable project context and decisions
 
-## Planned Repository Shape
+## Repository Shape
 
-The technical specification proposes a structure similar to:
+Current scaffold:
 
 ```text
 duck-race/
-  duck-race.php
-  includes/
-  assets/
-  templates/
+  plugin/
+    src/
+      Core/
+      Database/
+      Admin/
+      Public/
+      Services/
+      Rest/
+      Mail/
+      Audit/
+      Security/
+    templates/
+      admin/
+      public/
+      email/
+    assets/
+      css/
+      js/
+    languages/
   tests/
+    Unit/
+    Integration/
+  docs/
+  scripts/
   README.md
   BACKLOG.md
   CLAUDE.md
   AGENTS.md
   MEMORY.md
+  WORDPRESS_SETUP.md
 ```
 
-See `TECHNICAL_SPEC.md` for the detailed architecture, data model, journeys, security requirements and acceptance criteria.
+See `TECHNICAL_SPEC.md` and `WORDPRESS_SETUP.md` for detailed architecture, setup, journeys, and security requirements.

@@ -142,6 +142,13 @@ The buyer owns the entry for prize purposes, even if the duck is named for someo
 
 A Contact is the buyer or supporter.
 
+The contact record is the golden record for a person across all races and years.
+The primary relationship shape is:
+
+- Contact -> Purchases -> Race -> Duck Entries
+
+Rather than creating race-scoped duplicate contacts.
+
 Fields:
 
 - Contact ID
@@ -158,6 +165,22 @@ Fields:
 - Last purchase date
 - Notes
 - Anonymised flag
+
+Rules:
+
+- Email address is the unique contact key
+- The contacts table must enforce `UNIQUE(email)`
+- A new email address creates a new contact record
+- An existing email address updates the existing contact record
+- Contact changes such as surname, phone or address must preserve the audit trail rather than creating a duplicate contact
+
+Example:
+
+- Mary Smith <mary@example.com>
+- 2026 Evesham Race -> Purchase #101 -> Ducks 512, 513, 514
+- 2027 Evesham Race -> Purchase #422 -> Ducks 587, 612
+
+If Mary Smith later becomes Mary Jones with the same email address, the existing contact record is updated and the audit log records the change.
 
 Consent model:
 
@@ -177,17 +200,21 @@ Consent model:
 4. For each duck, visitor may optionally add a duck name or choose a specific duck number from the online range, if available.
 5. If they choose a specific number, uplift fee is added.
 6. Basket total updates dynamically.
-7. Visitor enters buyer details.
-8. Visitor chooses consent options:
+7. Visitor enters an email address.
+8. The public form may call a lightweight contact-recognition endpoint to check whether that email address already exists.
+9. If a contact already exists, the form can display a message such as "Welcome back Mary. We found a previous duck race participant. Your details have been pre-filled. Please review and update if necessary."
+10. The form pre-fills non-sensitive buyer details for review and amendment.
+11. Visitor completes or updates buyer details.
+12. Visitor chooses consent options:
    - Contact me about future duck races
    - Contact me about other organisation activities
-9. Visitor proceeds to Stripe Checkout.
-10. On successful payment:
+13. Visitor proceeds to Stripe Checkout.
+14. On successful payment:
     - Duck numbers are confirmed
     - Purchase is marked paid
     - Confirmation email is sent
     - Buyer sees success page
-11. If payment is abandoned or failed:
+15. If payment is abandoned or failed:
     - Purchase remains pending or abandoned
     - Reminder email may be sent if an email address was captured and consent or legal basis allows operational follow-up
 
@@ -246,6 +273,27 @@ Displays winner position, optional duck number, winner name or business name, an
 
 Contacts are uniquely identified by email address. A purchase submission must create or update a single contact record rather than duplicating contacts.
 
+The public buy form may perform contact recognition before checkout by calling a no-login endpoint such as `check-email`.
+
+The endpoint should:
+
+- Accept an email address
+- Return whether a matching contact exists
+- Return only the minimum non-sensitive fields needed to improve the form experience, such as first name and last name
+- Never expose address, phone, notes, consent history, purchase history or internal identifiers to the public form
+
+Example response:
+
+```json
+{
+  "exists": true,
+  "first_name": "Mary",
+  "last_name": "Jones"
+}
+```
+
+This endpoint is a convenience feature only. It does not create an account, authenticate the user or prove identity, and final contact updates must still be validated and recorded through the normal purchase flow.
+
 There are no public user accounts and no customer login area.
 
 ## 5. Admin Screens
@@ -287,6 +335,15 @@ Suggested custom tables:
 - `wp_duck_race_audit_log`
 
 The specification defines race, contact, purchase, entry, duck status, email log and audit log fields in detail. The entries table must enforce duck uniqueness per race to prevent double allocation.
+
+Relationship summary:
+
+- One Contact can have many Purchases
+- One Purchase belongs to one Contact and one Race
+- One Purchase can have many Duck Entries
+- One Race can have many Purchases and many Duck Entries
+
+This preserves a full longitudinal history for each participant while avoiding duplicate contact records across years.
 
 ## 8. Stripe Integration
 
