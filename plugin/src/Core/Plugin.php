@@ -29,6 +29,9 @@ class Plugin {
             ( new \DuckRace\Admin\ManualSalesPage() )->register();
             ( new \DuckRace\Admin\RaceReminderPage() )->register();
             ( new \DuckRace\Admin\WinnerManagementPage() )->register();
+            ( new \DuckRace\Admin\ReportingPage() )->register();
+            ( new \DuckRace\Admin\DuckGridPage() )->register();
+            ( new \DuckRace\Admin\CampaignMarketingPage() )->register();
         }
     }
 }

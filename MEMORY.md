@@ -236,6 +236,39 @@ All anonymisation actions are audit logged.
 Reason:
 Supports GDPR data minimisation while preserving financial and historical reporting integrity.
 
+Race Reporting And Export
+Decision:
+Reporting is race-scoped and surfaced in an admin Reporting page.
+Dashboard includes paid online/manual totals, revenue, duck availability/sold states, payment-status counts and consent totals.
+CSV exports are available for entries, purchases, contacts, winners and accounting summary.
+Exports require admin capability and nonce-protected POST actions.
+Reason:
+Provides operational transparency for race delivery and finance/admin workflows.
+
+Visual Duck Grid Operations
+Decision:
+Duck grid is race-scoped with server-side filters, search by duck number and pagination to keep large races usable.
+Tile colours represent operational state:
+    • pale yellow available
+    • bright yellow sold
+    • black lost
+    • muted reserved
+    • gold winner
+Duck detail view includes purchase/payment context and restricted contact details only for authorised admins.
+Lost/restore actions are capability and nonce protected and only allowed where allocation state permits.
+Reason:
+Supports fast race-day administration while preserving security and allocation integrity.
+
+Campaign Marketing Workflow
+Decision:
+Campaign marketing is managed in a dedicated admin page with nonce/capability protected actions.
+CSV supporter import upserts contacts by email and does not auto-opt-in unless consent columns are explicitly supplied.
+Previous supporter invitations default to duck-race-consented contacts, with optional documented legal-basis override.
+Abandoned checkout reminders target stale pending online purchases and always release stale reservations to prevent indefinite locking.
+Winner/future-race emails target consented participants and support previous race result merge tags for personalised messaging.
+Reason:
+Supports reusable campaign outreach while preserving consent controls and allocation integrity.
+
 UI Decisions
 Visual Duck Grid
 Status:

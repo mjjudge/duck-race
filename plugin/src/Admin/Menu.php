@@ -79,11 +79,38 @@ class Menu {
 
         add_submenu_page(
             self::TOP_LEVEL_SLUG,
+            __( 'Duck Grid', 'duck-race' ),
+            __( 'Duck Grid', 'duck-race' ),
+            'duck_race_manage_entries',
+            'duck-race-duck-grid',
+            [ new DuckGridPage(), 'render' ]
+        );
+
+        add_submenu_page(
+            self::TOP_LEVEL_SLUG,
             __( 'Winners', 'duck-race' ),
             __( 'Winners', 'duck-race' ),
             'duck_race_manage_winners',
             'duck-race-winners',
             [ new WinnerManagementPage(), 'render' ]
+        );
+
+        add_submenu_page(
+            self::TOP_LEVEL_SLUG,
+            __( 'Reporting', 'duck-race' ),
+            __( 'Reporting', 'duck-race' ),
+            'duck_race_manage_sales',
+            'duck-race-reporting',
+            [ new ReportingPage(), 'render' ]
+        );
+
+        add_submenu_page(
+            self::TOP_LEVEL_SLUG,
+            __( 'Campaigns', 'duck-race' ),
+            __( 'Campaigns', 'duck-race' ),
+            'duck_race_manage_contacts',
+            'duck-race-campaigns',
+            [ new CampaignMarketingPage(), 'render' ]
         );
 
         add_submenu_page(

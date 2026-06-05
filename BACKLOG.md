@@ -697,6 +697,8 @@ At this point the plugin can run a real duck race:
 
 EPIC 12 — Reporting and Export
 DR-110 — Add race sales dashboard
+Status
+    • [x] Complete
 Acceptance Criteria
     • Shows online sales, manual sales, ducks sold, revenue and available ducks.
     • Shows pending/failed/abandoned payments.
@@ -705,6 +707,8 @@ Dependencies
 DR-013, DR-014.
 
 DR-111 — Add CSV exports
+Status
+    • [x] Complete
 Acceptance Criteria
     • Export race entries.
     • Export purchases.
@@ -716,6 +720,8 @@ DR-110.
 
 EPIC 13 — Visual Duck Grid
 DR-120 — Build admin duck grid
+Status
+    • [x] Complete
 Acceptance Criteria
     • Shows numbered duck tiles.
     • Pale yellow = available.
@@ -727,6 +733,8 @@ Dependencies
 DR-014, DR-015.
 
 DR-121 — Add duck grid filters
+Status
+    • [x] Complete
 Acceptance Criteria
     • Filter by available, sold, manual, online, lost, reserved and winners.
     • Search by duck number.
@@ -735,6 +743,8 @@ Dependencies
 DR-120.
 
 DR-122 — Add duck detail modal
+Status
+    • [x] Complete
 Acceptance Criteria
     • Clicking a duck shows buyer, duck name, purchase, payment and status.
     • Contact details are only shown to authorised admins.
@@ -744,6 +754,8 @@ DR-121.
 
 EPIC 14 — Campaign Marketing
 DR-130 — Import previous supporter contacts
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can upload CSV.
     • Existing contacts are matched by email.
@@ -753,6 +765,8 @@ Dependencies
 DR-040.
 
 DR-131 — Create previous supporter invitation email
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can send invitation to eligible contacts.
     • Email includes race-specific buy link.
@@ -761,6 +775,8 @@ Dependencies
 DR-080, DR-130.
 
 DR-132 — Add abandoned checkout reminder
+Status
+    • [x] Complete
 Acceptance Criteria
     • Detects pending/abandoned purchases.
     • Sends reminder where operationally appropriate.
@@ -770,6 +786,8 @@ Dependencies
 DR-072, DR-080.
 
 DR-133 — Add winner/future-race marketing emails
+Status
+    • [x] Complete
 Acceptance Criteria
     • Admin can send future-race emails to previous participants with consent.
     • Templates can reference previous race result.

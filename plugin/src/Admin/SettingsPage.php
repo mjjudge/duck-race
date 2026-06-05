@@ -131,7 +131,7 @@ class SettingsPage {
 
         echo '<tr>';
         echo '<th scope="row">' . esc_html__( 'Available merge tags', 'duck-race' ) . '</th>';
-        echo '<td><code>{first_name}</code> <code>{last_name}</code> <code>{organisation_name}</code> <code>{race_title}</code> <code>{race_date}</code> <code>{race_time}</code> <code>{race_location}</code> <code>{duck_numbers}</code> <code>{duck_names}</code> <code>{purchase_total}</code></td>';
+        echo '<td><code>{first_name}</code> <code>{last_name}</code> <code>{organisation_name}</code> <code>{race_title}</code> <code>{race_date}</code> <code>{race_time}</code> <code>{race_location}</code> <code>{duck_numbers}</code> <code>{duck_names}</code> <code>{purchase_total}</code> <code>{buy_link}</code> <code>{previous_race_result}</code> <code>{winner_position}</code></td>';
         echo '</tr>';
         echo '</table>';
 
