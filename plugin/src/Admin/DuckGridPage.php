@@ -85,15 +85,17 @@ class DuckGridPage {
 
         echo '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;">';
         $this->legend( '#f5ef9a', __( 'Available', 'duck-race' ) );
-        $this->legend( '#ffe04f', __( 'Sold', 'duck-race' ) );
+        $this->legend( '#dfbe00', __( 'Sold', 'duck-race' ) );
         $this->legend( '#2f2f2f', __( 'Lost', 'duck-race' ), '#fff' );
         $this->legend( '#b8c1cc', __( 'Reserved', 'duck-race' ) );
-        $this->legend( '#f6c744', __( 'Winner', 'duck-race' ) );
+        $this->legend( '#c25a00', __( 'Winner', 'duck-race' ) );
         echo '</div>';
 
-        echo '<div id="duck-race-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;max-width:1200px;">';
+        $this->render_grid_styles();
+
+        echo '<div id="duck-race-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:2px;max-width:1200px;">';
         foreach ( $data['tiles'] as $tile ) {
-            $style = $this->tile_style( (string) $tile['status'] );
+            $tile_class = 'duck-race-tile duck-race-tile--' . esc_attr( $this->tile_status_key( (string) $tile['status'] ) );
             $detail = [
                 'duck' => (int) $tile['duck_number'],
                 'status' => (string) $tile['status'],
@@ -110,9 +112,9 @@ class DuckGridPage {
                 $detail['contact_phone'] = (string) $tile['contact_phone'];
             }
 
-            echo '<button type="button" class="duck-race-tile" data-detail="' . esc_attr( wp_json_encode( $detail ) ) . '"';
-            echo ' style="border:1px solid #666;border-radius:6px;padding:10px 6px;font-weight:700;cursor:pointer;' . esc_attr( $style ) . '">';
-            echo esc_html( (string) $tile['duck_number'] );
+            echo '<button type="button" class="' . $tile_class . '" data-detail="' . esc_attr( wp_json_encode( $detail ) ) . '">';
+            echo '<span class="duck-race-tile__icon" aria-hidden="true"></span>';
+            echo '<span class="duck-race-tile__number">' . esc_html( (string) $tile['duck_number'] ) . '</span>';
             echo '</button>';
         }
         echo '</div>';
@@ -282,15 +284,32 @@ class DuckGridPage {
         echo '</script>';
     }
 
-    private function tile_style( string $status ): string {
+    private function tile_status_key( string $status ): string {
         return match ( $status ) {
-            'available' => 'background:#f5ef9a;color:#222;',
-            'sold_online', 'sold_manual' => 'background:#ffe04f;color:#222;',
-            'lost' => 'background:#2f2f2f;color:#fff;',
-            'reserved' => 'background:#b8c1cc;color:#1c1c1c;',
-            'winner' => 'background:#f6c744;color:#222;',
-            default => 'background:#f0f0f0;color:#222;',
+            'available' => 'available',
+            'sold_online', 'sold_manual' => 'sold',
+            'lost' => 'lost',
+            'reserved' => 'reserved',
+            'winner' => 'winner',
+            default => 'default',
         };
+    }
+
+    private function render_grid_styles(): void {
+        $duck_icon_url = esc_url( DUCK_RACE_PLUGIN_URL . 'assets/images/lostduck.svg' );
+
+        echo '<style>';
+        echo '.duck-race-tile{position:relative;border:0;background:transparent;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:64px;}';
+        echo '.duck-race-tile:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px;border-radius:4px;}';
+        echo '.duck-race-tile__icon{width:62px;height:62px;background-color:var(--duck-color,#f0f0f0);-webkit-mask-image:url("' . $duck_icon_url . '");mask-image:url("' . $duck_icon_url . '");-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;filter:var(--duck-shadow,none);}';
+        echo '.duck-race-tile__number{position:absolute;top:66%;left:50%;transform:translate(-50%,-50%);line-height:1;font-size:16px;font-weight:800;color:var(--duck-number-color,#222);text-shadow:0 0 1px rgba(255,255,255,.4);z-index:2;pointer-events:none;}';
+        echo '.duck-race-tile--available{--duck-color:#f5ef9a;--duck-number-color:#222;}';
+        echo '.duck-race-tile--sold{--duck-color:#dfbe00;--duck-number-color:#222;--duck-shadow:drop-shadow(0 0 0 #111) drop-shadow(1px 0 0 #111) drop-shadow(-1px 0 0 #111) drop-shadow(0 1px 0 #111) drop-shadow(0 -1px 0 #111);}';
+        echo '.duck-race-tile--lost{--duck-color:#2f2f2f;--duck-number-color:#fff;}';
+        echo '.duck-race-tile--reserved{--duck-color:#b8c1cc;--duck-number-color:#1c1c1c;}';
+        echo '.duck-race-tile--winner{--duck-color:#c25a00;--duck-number-color:#fff;--duck-shadow:drop-shadow(0 0 0 #111) drop-shadow(1px 0 0 #111) drop-shadow(-1px 0 0 #111) drop-shadow(0 1px 0 #111) drop-shadow(0 -1px 0 #111);}';
+        echo '.duck-race-tile--default{--duck-color:#f0f0f0;--duck-number-color:#222;}';
+        echo '</style>';
     }
 
     private function legend( string $bg, string $label, string $text = '#222' ): void {

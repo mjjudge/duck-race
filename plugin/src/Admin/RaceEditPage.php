@@ -4,6 +4,7 @@ namespace DuckRace\Admin;
 
 use DuckRace\Database\Schema;
 use DuckRace\Security\RequestGuard;
+use DuckRace\Services\RaceLifecycleService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -15,7 +16,6 @@ class RaceEditPage {
         add_action( 'admin_post_duck_race_save_race', [ $this, 'handle_save' ] );
     }
 
-        use DuckRace\Services\RaceLifecycleService;
     public function render(): void {
         RequestGuard::require_capability( 'duck_race_manage_races' );
 

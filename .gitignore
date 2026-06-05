@@ -1,0 +1,7 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Common local overrides
+*.local
