@@ -39,6 +39,7 @@ class SettingsPage {
         $test_email_to = (string) ( $settings['email_test_recipient'] ?? $contact_email );
         $retention_days = (int) ( $settings['retention_non_opt_in_days'] ?? 365 );
         $confirm_uninstall_data_removal = ! empty( $settings['confirm_uninstall_data_removal'] );
+        $tile_colors = $this->load_tile_colors( $settings );
         $retention_last_run_at = (string) get_option( 'duck_race_retention_last_run_at', '' );
         $retention_last_run_count = (int) get_option( 'duck_race_retention_last_run_count', 0 );
 
@@ -150,6 +151,40 @@ class SettingsPage {
         echo '</tr>';
 
         echo '<tr>';
+        echo '<th scope="row">' . esc_html__( 'Duck tile colours', 'duck-race' ) . '</th>';
+        echo '<td>';
+        echo '<table>';
+        echo '<thead><tr>';
+        echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'State', 'duck-race' ) . '</th>';
+        echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'Background', 'duck-race' ) . '</th>';
+        echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'Text', 'duck-race' ) . '</th>';
+        echo '</tr></thead>';
+        echo '<tbody>';
+        $tile_state_labels = [
+            'available' => __( 'Available', 'duck-race' ),
+            'sold'      => __( 'Sold', 'duck-race' ),
+            'lost'      => __( 'Lost', 'duck-race' ),
+            'reserved'  => __( 'Reserved', 'duck-race' ),
+            'winner'    => __( 'Winner', 'duck-race' ),
+        ];
+        foreach ( $tile_state_labels as $state => $label ) {
+            $bg = esc_attr( (string) ( $tile_colors[ $state ]['bg'] ?? '#f0f0f0' ) );
+            $text = esc_attr( (string) ( $tile_colors[ $state ]['text'] ?? '#222222' ) );
+            echo '<tr>';
+            echo '<td style="padding:4px 8px;">' . esc_html( $label ) . '</td>';
+            echo '<td style="padding:4px 8px;"><input type="color" name="tile_bg_' . esc_attr( $state ) . '" value="' . $bg . '" /></td>';
+            echo '<td style="padding:4px 8px;"><select name="tile_text_' . esc_attr( $state ) . '">';
+            echo '<option value="#222222" ' . selected( $text, '#222222', false ) . '>' . esc_html__( 'Dark (#222)', 'duck-race' ) . '</option>';
+            echo '<option value="#ffffff" ' . selected( $text, '#ffffff', false ) . '>' . esc_html__( 'Light (#fff)', 'duck-race' ) . '</option>';
+            echo '</select></td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
+        echo '<p class="description">' . esc_html__( 'Background and text colours for each duck tile state. These apply on the Duck Grid admin page. Changes take effect immediately on save.', 'duck-race' ) . '</p>';
+        echo '</td>';
+        echo '</tr>';
+
+        echo '<tr>';
         echo '<th scope="row">' . esc_html__( 'Merge tags', 'duck-race' ) . '</th>';
         echo '<td>';
         echo '<p><code>{first_name}</code> <code>{last_name}</code> <code>{organisation_name}</code> <code>{race_title}</code> <code>{race_date}</code> <code>{race_time}</code> <code>{race_location}</code> <code>{duck_numbers}</code> <code>{duck_names}</code> <code>{purchase_total}</code> <code>{buy_link}</code> <code>{previous_race_result}</code> <code>{winner_position}</code></p>';
@@ -212,6 +247,18 @@ class SettingsPage {
         $retention_days = max( 30, min( 3650, (int) ( $_POST['retention_non_opt_in_days'] ?? (int) ( $existing['retention_non_opt_in_days'] ?? 365 ) ) ) );
         $confirm_uninstall_data_removal = isset( $_POST['confirm_uninstall_data_removal'] ) ? 1 : 0;
 
+        $tile_color_defaults = $this->load_tile_colors( $existing );
+        $tile_colors_saved = [];
+        $valid_text_colors = [ '#222222', '#ffffff' ];
+        foreach ( array_keys( $tile_color_defaults ) as $state ) {
+            $bg_raw = sanitize_hex_color( wp_unslash( $_POST[ 'tile_bg_' . $state ] ?? '' ) );
+            $text_raw = sanitize_text_field( wp_unslash( $_POST[ 'tile_text_' . $state ] ?? '' ) );
+            $tile_colors_saved[ $state ] = [
+                'bg'   => ( '' !== $bg_raw ) ? $bg_raw : $tile_color_defaults[ $state ]['bg'],
+                'text' => in_array( $text_raw, $valid_text_colors, true ) ? $text_raw : $tile_color_defaults[ $state ]['text'],
+            ];
+        }
+
         $secret_key = '' !== $secret_key_input
             ? $secret_key_input
             : (string) ( $existing['stripe_secret_key'] ?? '' );
@@ -235,6 +282,7 @@ class SettingsPage {
                 'email_test_recipient' => sanitize_email( wp_unslash( $_POST['email_test_recipient'] ?? (string) ( $existing['email_test_recipient'] ?? '' ) ) ),
                 'retention_non_opt_in_days' => $retention_days,
                 'confirm_uninstall_data_removal' => $confirm_uninstall_data_removal,
+                'tile_colors' => $tile_colors_saved,
             ],
             false
         );
@@ -305,6 +353,30 @@ class SettingsPage {
 <p>The race takes place on {race_date} at {race_time}, {race_location}.</p>
 <p>We look forward to seeing you there. Good luck!</p>
 <p>Best wishes,<br />{organisation_name}</p>';
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, array{bg: string, text: string}>
+     */
+    private function load_tile_colors( array $settings ): array {
+        $defaults = [
+            'available' => [ 'bg' => '#f5ef9a', 'text' => '#222222' ],
+            'sold'      => [ 'bg' => '#dfbe00', 'text' => '#222222' ],
+            'lost'      => [ 'bg' => '#2f2f2f', 'text' => '#ffffff' ],
+            'reserved'  => [ 'bg' => '#b8c1cc', 'text' => '#222222' ],
+            'winner'    => [ 'bg' => '#c25a00', 'text' => '#ffffff' ],
+        ];
+        $saved = is_array( $settings['tile_colors'] ?? null ) ? (array) $settings['tile_colors'] : [];
+        foreach ( array_keys( $defaults ) as $state ) {
+            if ( ! empty( $saved[ $state ]['bg'] ) ) {
+                $defaults[ $state ]['bg'] = (string) $saved[ $state ]['bg'];
+            }
+            if ( ! empty( $saved[ $state ]['text'] ) ) {
+                $defaults[ $state ]['text'] = (string) $saved[ $state ]['text'];
+            }
+        }
+        return $defaults;
     }
 
     private function masked_placeholder( string $secret ): string {

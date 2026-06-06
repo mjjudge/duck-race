@@ -83,15 +83,16 @@ class DuckGridPage {
             (int) $data['total_pages']
         ) . '</p>';
 
+        $tile_colours = $this->tile_colours();
         echo '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;">';
-        $this->legend( '#f5ef9a', __( 'Available', 'duck-race' ) );
-        $this->legend( '#dfbe00', __( 'Sold', 'duck-race' ) );
-        $this->legend( '#2f2f2f', __( 'Lost', 'duck-race' ), '#fff' );
-        $this->legend( '#b8c1cc', __( 'Reserved', 'duck-race' ) );
-        $this->legend( '#c25a00', __( 'Winner', 'duck-race' ), '#fff' );
+        $this->legend( $tile_colours['available']['bg'], __( 'Available', 'duck-race' ), $tile_colours['available']['text'] );
+        $this->legend( $tile_colours['sold']['bg'], __( 'Sold', 'duck-race' ), $tile_colours['sold']['text'] );
+        $this->legend( $tile_colours['lost']['bg'], __( 'Lost', 'duck-race' ), $tile_colours['lost']['text'] );
+        $this->legend( $tile_colours['reserved']['bg'], __( 'Reserved', 'duck-race' ), $tile_colours['reserved']['text'] );
+        $this->legend( $tile_colours['winner']['bg'], __( 'Winner', 'duck-race' ), $tile_colours['winner']['text'] );
         echo '</div>';
 
-        $this->render_grid_styles();
+        $this->render_grid_styles( $tile_colours );
 
         echo '<div id="duck-race-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:2px;max-width:1200px;">';
         foreach ( $data['tiles'] as $tile ) {
@@ -347,7 +348,10 @@ class DuckGridPage {
         };
     }
 
-    private function render_grid_styles(): void {
+    /**
+     * @param array<string, array{bg: string, text: string}> $colours
+     */
+    private function render_grid_styles( array $colours ): void {
         $duck_icon_url = esc_url( DUCK_RACE_PLUGIN_URL . 'assets/images/lostduck.svg' );
 
         echo '<style>';
@@ -356,13 +360,39 @@ class DuckGridPage {
         echo '.duck-race-tile__icon{width:62px;height:62px;background-color:var(--duck-color,#f0f0f0);-webkit-mask-image:url("' . $duck_icon_url . '");mask-image:url("' . $duck_icon_url . '");-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;filter:var(--duck-shadow,none);}';
         echo '.duck-race-tile__number{position:absolute;top:66%;left:50%;transform:translate(-50%,-50%);line-height:1;font-size:16px;font-weight:800;color:var(--duck-number-color,#222);text-shadow:0 0 1px rgba(255,255,255,.4);z-index:2;pointer-events:none;}';
         echo '.duck-race-tile__note{position:absolute;bottom:2px;right:4px;font-size:12px;line-height:1;color:var(--duck-number-color,#222);z-index:3;pointer-events:none;opacity:.75;}';
-        echo '.duck-race-tile--available{--duck-color:#f5ef9a;--duck-number-color:#222;}';
-        echo '.duck-race-tile--sold{--duck-color:#dfbe00;--duck-number-color:#222;--duck-shadow:drop-shadow(0 0 0 #111) drop-shadow(1px 0 0 #111) drop-shadow(-1px 0 0 #111) drop-shadow(0 1px 0 #111) drop-shadow(0 -1px 0 #111);}';
-        echo '.duck-race-tile--lost{--duck-color:#2f2f2f;--duck-number-color:#fff;}';
-        echo '.duck-race-tile--reserved{--duck-color:#b8c1cc;--duck-number-color:#1c1c1c;}';
-        echo '.duck-race-tile--winner{--duck-color:#c25a00;--duck-number-color:#fff;--duck-shadow:drop-shadow(0 0 0 #111) drop-shadow(1px 0 0 #111) drop-shadow(-1px 0 0 #111) drop-shadow(0 1px 0 #111) drop-shadow(0 -1px 0 #111);}';
+
+        $c = $colours;
+        echo '.duck-race-tile--available{--duck-color:' . esc_attr( $c['available']['bg'] ) . ';--duck-number-color:' . esc_attr( $c['available']['text'] ) . ';}';
+        echo '.duck-race-tile--sold{--duck-color:' . esc_attr( $c['sold']['bg'] ) . ';--duck-number-color:' . esc_attr( $c['sold']['text'] ) . ';--duck-shadow:drop-shadow(0 0 0 #111) drop-shadow(1px 0 0 #111) drop-shadow(-1px 0 0 #111) drop-shadow(0 1px 0 #111) drop-shadow(0 -1px 0 #111);}';
+        echo '.duck-race-tile--lost{--duck-color:' . esc_attr( $c['lost']['bg'] ) . ';--duck-number-color:' . esc_attr( $c['lost']['text'] ) . ';}';
+        echo '.duck-race-tile--reserved{--duck-color:' . esc_attr( $c['reserved']['bg'] ) . ';--duck-number-color:' . esc_attr( $c['reserved']['text'] ) . ';}';
+        echo '.duck-race-tile--winner{--duck-color:' . esc_attr( $c['winner']['bg'] ) . ';--duck-number-color:' . esc_attr( $c['winner']['text'] ) . ';--duck-shadow:drop-shadow(0 0 0 #111) drop-shadow(1px 0 0 #111) drop-shadow(-1px 0 0 #111) drop-shadow(0 1px 0 #111) drop-shadow(0 -1px 0 #111);}';
         echo '.duck-race-tile--default{--duck-color:#f0f0f0;--duck-number-color:#222;}';
         echo '</style>';
+    }
+
+    /**
+     * @return array<string, array{bg: string, text: string}>
+     */
+    private function tile_colours(): array {
+        $settings = get_option( 'duck_race_settings', [] );
+        $saved = is_array( $settings['tile_colors'] ?? null ) ? (array) $settings['tile_colors'] : [];
+        $colours = [
+            'available' => [ 'bg' => '#f5ef9a', 'text' => '#222222' ],
+            'sold'      => [ 'bg' => '#dfbe00', 'text' => '#222222' ],
+            'lost'      => [ 'bg' => '#2f2f2f', 'text' => '#ffffff' ],
+            'reserved'  => [ 'bg' => '#b8c1cc', 'text' => '#222222' ],
+            'winner'    => [ 'bg' => '#c25a00', 'text' => '#ffffff' ],
+        ];
+        foreach ( array_keys( $colours ) as $state ) {
+            if ( ! empty( $saved[ $state ]['bg'] ) ) {
+                $colours[ $state ]['bg'] = (string) $saved[ $state ]['bg'];
+            }
+            if ( ! empty( $saved[ $state ]['text'] ) ) {
+                $colours[ $state ]['text'] = (string) $saved[ $state ]['text'];
+            }
+        }
+        return $colours;
     }
 
     private function legend( string $bg, string $label, string $text = '#222' ): void {

@@ -14,6 +14,14 @@ class RaceEditPage {
 
     public function register(): void {
         add_action( 'admin_post_duck_race_save_race', [ $this, 'handle_save' ] );
+        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
+    }
+
+    public function enqueue_scripts(): void {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( isset( $_GET['page'] ) && 'duck-race-race-edit' === $_GET['page'] ) {
+            wp_enqueue_media();
+        }
     }
 
     public function render(): void {
@@ -59,6 +67,7 @@ class RaceEditPage {
         $this->render_text_row( 'race_time', __( 'Race time', 'duck-race' ), (string) $race['race_time'], 'time' );
         $this->render_text_row( 'location', __( 'Location', 'duck-race' ), (string) $race['location'] );
         $this->render_textarea_row( 'public_description', __( 'Public description', 'duck-race' ), (string) $race['public_description'] );
+        $this->render_image_row( (int) $race['image_id'] );
         $this->render_select_row( 'status', __( 'Status', 'duck-race' ), (string) $race['status'], [ 'draft', 'open', 'closed', 'completed', 'archived' ] );
         $this->render_text_row(
             'sales_open_at',
@@ -121,6 +130,7 @@ class RaceEditPage {
             'price_per_duck' => number_format( (float) ( $_POST['price_per_duck'] ?? 0 ), 2, '.', '' ),
             'chosen_number_uplift' => number_format( (float) ( $_POST['chosen_number_uplift'] ?? 0 ), 2, '.', '' ),
             'max_ducks_per_transaction' => max( 1, (int) ( $_POST['max_ducks_per_transaction'] ?? 20 ) ),
+            'image_id' => absint( $_POST['image_id'] ?? 0 ) ?: null,
             'extra_donation_enabled' => 0,
         ];
 
@@ -221,6 +231,7 @@ class RaceEditPage {
             'price_per_duck' => '0.00',
             'chosen_number_uplift' => '0.00',
             'max_ducks_per_transaction' => 20,
+            'image_id' => 0,
         ];
 
         $race_id = (int) ( $_GET['id'] ?? 0 );
@@ -273,5 +284,58 @@ class RaceEditPage {
         }
         echo '</select></td>';
         echo '</tr>';
+    }
+
+    private function render_image_row( int $image_id ): void {
+        $thumb_url = $image_id > 0 ? (string) wp_get_attachment_image_url( $image_id, 'medium' ) : '';
+        $has_image = '' !== $thumb_url;
+
+        echo '<tr>';
+        echo '<th scope="row"><label>' . esc_html__( 'Race image', 'duck-race' ) . '</label></th>';
+        echo '<td>';
+        echo '<input type="hidden" name="image_id" id="race-image-id" value="' . esc_attr( (string) $image_id ) . '" />';
+
+        echo '<div style="margin-bottom:8px;">';
+        echo '<img id="race-image-preview" src="' . esc_url( $thumb_url ) . '" alt="" style="max-width:200px;max-height:150px;display:' . ( $has_image ? 'block' : 'none' ) . ';margin-bottom:6px;border:1px solid #ccc;" />';
+        echo '</div>';
+
+        echo '<button type="button" class="button" id="race-image-select">' . esc_html__( 'Select image', 'duck-race' ) . '</button> ';
+        echo '<button type="button" class="button" id="race-image-remove" style="display:' . ( $has_image ? 'inline-block' : 'none' ) . ';">' . esc_html__( 'Remove image', 'duck-race' ) . '</button>';
+
+        echo '<p class="description">' . esc_html__( 'Optional image for this race — shown in the race admin view. Select from the media library.', 'duck-race' ) . '</p>';
+        echo '</td>';
+        echo '</tr>';
+
+        echo '<script>';
+        echo '(function(){';
+        echo 'var imageId=document.getElementById("race-image-id");';
+        echo 'var imagePreview=document.getElementById("race-image-preview");';
+        echo 'var selectBtn=document.getElementById("race-image-select");';
+        echo 'var removeBtn=document.getElementById("race-image-remove");';
+        echo 'var frame;';
+
+        echo 'selectBtn.addEventListener("click",function(e){';
+        echo 'e.preventDefault();';
+        echo 'if(frame){frame.open();return;}';
+        echo 'frame=wp.media({title:"' . esc_js( __( 'Select Race Image', 'duck-race' ) ) . '",button:{text:"' . esc_js( __( 'Use this image', 'duck-race' ) ) . '"},multiple:false,library:{type:"image"}});';
+        echo 'frame.on("select",function(){';
+        echo 'var att=frame.state().get("selection").first().toJSON();';
+        echo 'imageId.value=att.id;';
+        echo 'imagePreview.src=att.sizes&&att.sizes.medium?att.sizes.medium.url:att.url;';
+        echo 'imagePreview.style.display="block";';
+        echo 'removeBtn.style.display="inline-block";';
+        echo '});';
+        echo 'frame.open();';
+        echo '});';
+
+        echo 'removeBtn.addEventListener("click",function(e){';
+        echo 'e.preventDefault();';
+        echo 'imageId.value="";';
+        echo 'imagePreview.src="";';
+        echo 'imagePreview.style.display="none";';
+        echo 'removeBtn.style.display="none";';
+        echo '});';
+        echo '})();';
+        echo '</script>';
     }
 }

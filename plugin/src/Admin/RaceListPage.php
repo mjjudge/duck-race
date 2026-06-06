@@ -22,6 +22,7 @@ class RaceListPage {
 
         echo '<table class="widefat striped">';
         echo '<thead><tr>';
+        echo '<th>' . esc_html__( 'Image', 'duck-race' ) . '</th>';
         echo '<th>' . esc_html__( 'Title', 'duck-race' ) . '</th>';
         echo '<th>' . esc_html__( 'Status', 'duck-race' ) . '</th>';
         echo '<th>' . esc_html__( 'Race Date', 'duck-race' ) . '</th>';
@@ -32,14 +33,23 @@ class RaceListPage {
         echo '<tbody>';
 
         if ( empty( $rows ) ) {
-            echo '<tr><td colspan="6">' . esc_html__( 'No races found yet.', 'duck-race' ) . '</td></tr>';
+            echo '<tr><td colspan="7">' . esc_html__( 'No races found yet.', 'duck-race' ) . '</td></tr>';
         } else {
             foreach ( $rows as $row ) {
                 $race_date_display = $this->format_date( (string) $row->race_date );
                 $sales_open_display = $this->format_datetime( (string) $row->sales_open_at );
                 $sales_close_display = $this->format_datetime( (string) $row->sales_close_at );
                 $sales_window = $sales_open_display . ' – ' . $sales_close_display;
+                $image_id = (int) ( $row->image_id ?? 0 );
+                $thumb_url = $image_id > 0 ? (string) wp_get_attachment_image_url( $image_id, 'thumbnail' ) : '';
                 echo '<tr>';
+                echo '<td>';
+                if ( '' !== $thumb_url ) {
+                    echo '<img src="' . esc_url( $thumb_url ) . '" alt="" style="width:60px;height:45px;object-fit:cover;border:1px solid #ccc;" />';
+                } else {
+                    echo '<span style="color:#aaa;">—</span>';
+                }
+                echo '</td>';
                 echo '<td>' . esc_html( (string) $row->title ) . '</td>';
                 echo '<td>' . esc_html( ucfirst( (string) $row->status ) ) . '</td>';
                 echo '<td>' . esc_html( $race_date_display ) . '</td>';
@@ -98,7 +108,7 @@ class RaceListPage {
 
         if ( $entries_exists === $entries_table ) {
             $sql = "
-                SELECT r.id, r.title, r.status, r.race_date, r.sales_open_at, r.sales_close_at,
+                SELECT r.id, r.title, r.status, r.race_date, r.sales_open_at, r.sales_close_at, r.image_id,
                     COALESCE(e.ducks_sold, 0) AS ducks_sold
                 FROM {$races_table} r
                 LEFT JOIN (
@@ -114,7 +124,7 @@ class RaceListPage {
         }
 
         $sql = "
-            SELECT r.id, r.title, r.status, r.race_date, r.sales_open_at, r.sales_close_at,
+            SELECT r.id, r.title, r.status, r.race_date, r.sales_open_at, r.sales_close_at, r.image_id,
                 0 AS ducks_sold
             FROM {$races_table} r
             ORDER BY r.race_date DESC, r.id DESC
