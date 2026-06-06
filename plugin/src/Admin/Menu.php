@@ -13,12 +13,14 @@ class Menu {
     }
 
     public function register_pages(): void {
+        // Pass '' as callback so add_menu_page does not register a duplicate hook.
+        // The Races submenu below (same slug) owns the render callback.
         add_menu_page(
             __( 'Duck Race', 'duck-race' ),
             __( 'Duck Race', 'duck-race' ),
             'duck_race_access',
             self::TOP_LEVEL_SLUG,
-            [ new RaceListPage(), 'render' ],
+            '',
             'dashicons-flag',
             56
         );
@@ -30,15 +32,6 @@ class Menu {
             'duck_race_manage_races',
             self::TOP_LEVEL_SLUG,
             [ new RaceListPage(), 'render' ]
-        );
-
-        add_submenu_page(
-            self::TOP_LEVEL_SLUG,
-            __( 'Settings', 'duck-race' ),
-            __( 'Settings', 'duck-race' ),
-            'duck_race_manage_settings',
-            'duck-race-settings',
-            [ new SettingsPage(), 'render' ]
         );
 
         add_submenu_page(
@@ -120,6 +113,24 @@ class Menu {
             'duck_race_manage_sales',
             'duck-race-race-reminders',
             [ new RaceReminderPage(), 'render' ]
+        );
+
+        add_submenu_page(
+            self::TOP_LEVEL_SLUG,
+            __( 'Help', 'duck-race' ),
+            __( 'Help', 'duck-race' ),
+            'duck_race_access',
+            'duck-race-help',
+            [ new HelpPage(), 'render' ]
+        );
+
+        add_submenu_page(
+            self::TOP_LEVEL_SLUG,
+            __( 'Settings', 'duck-race' ),
+            __( 'Settings', 'duck-race' ),
+            'duck_race_manage_settings',
+            'duck-race-settings',
+            [ new SettingsPage(), 'render' ]
         );
     }
 }

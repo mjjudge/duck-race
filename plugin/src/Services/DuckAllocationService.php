@@ -63,6 +63,23 @@ class DuckAllocationService {
 
     protected function is_lost_for_test( int $race_id, int $duck_number ): bool {
         global $wpdb;
+
+        // Check new per-duck physical state table first.
+        $physical_table = Schema::table_name( 'duck_physical_state' );
+        $physical_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $physical_table ) );
+        if ( $physical_exists === $physical_table ) {
+            $is_lost = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT is_lost FROM {$physical_table} WHERE duck_number = %d",
+                    $duck_number
+                )
+            );
+            if ( null !== $is_lost ) {
+                return '1' === (string) $is_lost;
+            }
+        }
+
+        // Fall back to legacy race-scoped duck_status table.
         $table = Schema::table_name( 'duck_status' );
         $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
         if ( $exists !== $table ) {

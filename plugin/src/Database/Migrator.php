@@ -22,6 +22,8 @@ class Migrator {
         '0.7.0' => Migrations\CreateAuditLogTable::class,
         '0.8.0' => Migrations\CreateEmailLogTable::class,
         '0.9.0' => Migrations\CreateWinnerPositionsTable::class,
+        '1.0.0' => Migrations\CreateDuckPhysicalStateTable::class,
+        '1.1.0' => Migrations\AddCountyToContacts::class,
     ];
 
     public function run(): void {

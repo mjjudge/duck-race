@@ -35,11 +35,14 @@ class RaceListPage {
             echo '<tr><td colspan="6">' . esc_html__( 'No races found yet.', 'duck-race' ) . '</td></tr>';
         } else {
             foreach ( $rows as $row ) {
-                $sales_window = trim( (string) $row->sales_open_at ) . ' - ' . trim( (string) $row->sales_close_at );
+                $race_date_display = $this->format_date( (string) $row->race_date );
+                $sales_open_display = $this->format_datetime( (string) $row->sales_open_at );
+                $sales_close_display = $this->format_datetime( (string) $row->sales_close_at );
+                $sales_window = $sales_open_display . ' – ' . $sales_close_display;
                 echo '<tr>';
                 echo '<td>' . esc_html( (string) $row->title ) . '</td>';
-                echo '<td>' . esc_html( (string) $row->status ) . '</td>';
-                echo '<td>' . esc_html( (string) $row->race_date ) . '</td>';
+                echo '<td>' . esc_html( ucfirst( (string) $row->status ) ) . '</td>';
+                echo '<td>' . esc_html( $race_date_display ) . '</td>';
                 echo '<td>' . esc_html( $sales_window ) . '</td>';
                 echo '<td>' . esc_html( (string) $row->ducks_sold ) . '</td>';
                 echo '<td>';
@@ -58,6 +61,22 @@ class RaceListPage {
         echo '</tbody>';
         echo '</table>';
         echo '</div>';
+    }
+
+    private function format_date( string $value ): string {
+        if ( '' === $value ) {
+            return '—';
+        }
+        $ts = strtotime( $value );
+        return false !== $ts ? date( 'd/m/Y', $ts ) : $value;
+    }
+
+    private function format_datetime( string $value ): string {
+        if ( '' === $value ) {
+            return '—';
+        }
+        $ts = strtotime( $value );
+        return false !== $ts ? date( 'd/m/Y H:i', $ts ) : $value;
     }
 
     /**

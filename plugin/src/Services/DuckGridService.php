@@ -53,12 +53,14 @@ class DuckGridService {
         $end = (int) $race->total_range_end;
         $all_numbers = range( $start, $end );
 
-        $lost = $this->lost_numbers( $race_id );
+        $lost = $this->lost_numbers( $start, $end );
         $entries = $this->entry_map( $race_id, $start, $end );
+        $physical = $this->physical_state_map( $start, $end );
 
         $filtered = [];
         foreach ( $all_numbers as $number ) {
             $entry = $entries[ $number ] ?? null;
+            $state = $physical[ $number ] ?? null;
             $status = $this->status_for_number( $entry, isset( $lost[ $number ] ) );
 
             if ( $search_number > 0 && $number !== $search_number ) {
@@ -78,15 +80,18 @@ class DuckGridService {
                 'duck_name' => is_array( $entry ) ? (string) ( $entry['duck_name'] ?? '' ) : '',
                 'entry_status' => is_array( $entry ) ? (string) ( $entry['entry_status'] ?? '' ) : '',
                 'winner_position' => is_array( $entry ) ? (int) ( $entry['winner_position'] ?? 0 ) : 0,
+                'prize_label' => is_array( $entry ) ? (string) ( $entry['prize_label'] ?? '' ) : '',
                 'contact_name' => is_array( $entry ) ? trim( (string) ( $entry['first_name'] ?? '' ) . ' ' . (string) ( $entry['last_name'] ?? '' ) ) : '',
                 'organisation_name' => is_array( $entry ) ? (string) ( $entry['organisation_name'] ?? '' ) : '',
                 'contact_email' => is_array( $entry ) ? (string) ( $entry['email'] ?? '' ) : '',
                 'contact_phone' => is_array( $entry ) ? (string) ( $entry['phone'] ?? '' ) : '',
+                'has_comment' => is_array( $state ) && '' !== (string) ( $state['comment'] ?? '' ),
+                'duck_comment' => is_array( $state ) ? (string) ( $state['comment'] ?? '' ) : '',
             ];
         }
 
         $total_tiles = count( $filtered );
-        $per_page = max( 100, min( 400, $per_page ) );
+        $per_page = max( 50, min( 500, $per_page ) );
         $total_pages = max( 1, (int) ceil( $total_tiles / $per_page ) );
         $page = max( 1, min( $total_pages, $page ) );
 
@@ -124,24 +129,65 @@ class DuckGridService {
         return 0 === $count;
     }
 
-    public function is_lost( int $race_id, int $duck_number ): bool {
+    public function is_lost( int $duck_number ): bool {
         global $wpdb;
-        $table = Schema::table_name( 'duck_status' );
-        $status = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT status FROM {$table} WHERE race_id = %d AND duck_number = %d",
-                $race_id,
-                $duck_number
-            )
-        );
 
-        return is_string( $status ) && 'lost' === $status;
+        $physical_table = Schema::table_name( 'duck_physical_state' );
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $physical_table ) );
+        if ( $exists === $physical_table ) {
+            $is_lost = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT is_lost FROM {$physical_table} WHERE duck_number = %d",
+                    $duck_number
+                )
+            );
+            if ( null !== $is_lost ) {
+                return '1' === (string) $is_lost;
+            }
+        }
+
+        return false;
     }
 
     /**
      * @return array<int, bool>
      */
-    private function lost_numbers( int $race_id ): array {
+    private function lost_numbers( int $start, int $end ): array {
+        global $wpdb;
+
+        $table = Schema::table_name( 'duck_physical_state' );
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+        if ( $exists !== $table ) {
+            return $this->lost_numbers_legacy( $start, $end );
+        }
+
+        $rows = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT duck_number FROM {$table}
+                 WHERE is_lost = 1 AND duck_number BETWEEN %d AND %d",
+                $start,
+                $end
+            )
+        );
+
+        if ( ! is_array( $rows ) ) {
+            return [];
+        }
+
+        $map = [];
+        foreach ( $rows as $duck_number ) {
+            $map[ (int) $duck_number ] = true;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Fallback to old duck_status table when new table doesn't exist yet.
+     *
+     * @return array<int, bool>
+     */
+    private function lost_numbers_legacy( int $start, int $end ): array {
         global $wpdb;
 
         $table = Schema::table_name( 'duck_status' );
@@ -150,7 +196,15 @@ class DuckGridService {
             return [];
         }
 
-        $rows = $wpdb->get_col( $wpdb->prepare( "SELECT duck_number FROM {$table} WHERE race_id = %d AND status = 'lost'", $race_id ) );
+        $rows = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT DISTINCT duck_number FROM {$table}
+                 WHERE status = 'lost' AND duck_number BETWEEN %d AND %d",
+                $start,
+                $end
+            )
+        );
+
         if ( ! is_array( $rows ) ) {
             return [];
         }
@@ -158,6 +212,40 @@ class DuckGridService {
         $map = [];
         foreach ( $rows as $duck_number ) {
             $map[ (int) $duck_number ] = true;
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function physical_state_map( int $start, int $end ): array {
+        global $wpdb;
+
+        $table = Schema::table_name( 'duck_physical_state' );
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+        if ( $exists !== $table ) {
+            return [];
+        }
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT duck_number, is_lost, comment FROM {$table}
+                 WHERE duck_number BETWEEN %d AND %d",
+                $start,
+                $end
+            ),
+            ARRAY_A
+        );
+
+        if ( ! is_array( $rows ) ) {
+            return [];
+        }
+
+        $map = [];
+        foreach ( $rows as $row ) {
+            $map[ (int) $row['duck_number'] ] = $row;
         }
 
         return $map;
@@ -175,7 +263,7 @@ class DuckGridService {
 
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT e.duck_number, e.duck_name, e.entry_status, e.purchase_id, e.winner_position,
+                "SELECT e.duck_number, e.duck_name, e.entry_status, e.purchase_id, e.winner_position, e.prize_label,
                         p.payment_status, p.purchase_source,
                         c.first_name, c.last_name, c.organisation_name, c.email, c.phone
                  FROM {$entries} e

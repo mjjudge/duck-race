@@ -40,22 +40,57 @@ class RaceEditPage {
 
         echo '<table class="form-table" role="presentation">';
         $this->render_text_row( 'title', __( 'Title', 'duck-race' ), (string) $race['title'] );
-        $this->render_text_row( 'slug', __( 'Slug', 'duck-race' ), (string) $race['slug'] );
-        $this->render_text_row( 'race_date', __( 'Race date', 'duck-race' ), (string) $race['race_date'], 'date' );
+        $this->render_text_row(
+            'slug',
+            __( 'Slug', 'duck-race' ),
+            (string) $race['slug'],
+            'text',
+            '',
+            __( 'The short identifier used in this race\'s web page address — e.g. evesham-duck-race-2026. Use lowercase letters, numbers and hyphens only. Must be unique.', 'duck-race' )
+        );
+        $this->render_text_row(
+            'race_date',
+            __( 'Race date', 'duck-race' ),
+            (string) $race['race_date'],
+            'date',
+            '',
+            __( 'Enter as dd/mm/yyyy.', 'duck-race' )
+        );
         $this->render_text_row( 'race_time', __( 'Race time', 'duck-race' ), (string) $race['race_time'], 'time' );
         $this->render_text_row( 'location', __( 'Location', 'duck-race' ), (string) $race['location'] );
         $this->render_textarea_row( 'public_description', __( 'Public description', 'duck-race' ), (string) $race['public_description'] );
         $this->render_select_row( 'status', __( 'Status', 'duck-race' ), (string) $race['status'], [ 'draft', 'open', 'closed', 'completed', 'archived' ] );
-        $this->render_text_row( 'sales_open_at', __( 'Sales open at', 'duck-race' ), (string) $race['sales_open_at'], 'datetime-local' );
-        $this->render_text_row( 'sales_close_at', __( 'Sales close at', 'duck-race' ), (string) $race['sales_close_at'], 'datetime-local' );
+        $this->render_text_row(
+            'sales_open_at',
+            __( 'Sales open at', 'duck-race' ),
+            (string) $race['sales_open_at'],
+            'datetime-local',
+            '',
+            __( 'Date and time when online sales open. Enter as dd/mm/yyyy hh:mm.', 'duck-race' )
+        );
+        $this->render_text_row(
+            'sales_close_at',
+            __( 'Sales close at', 'duck-race' ),
+            (string) $race['sales_close_at'],
+            'datetime-local',
+            '',
+            __( 'Date and time when online sales close. Enter as dd/mm/yyyy hh:mm.', 'duck-race' )
+        );
 
         $this->render_text_row( 'manual_range_start', __( 'Manual range start', 'duck-race' ), (string) $race['manual_range_start'], 'number' );
         $this->render_text_row( 'manual_range_end', __( 'Manual range end', 'duck-race' ), (string) $race['manual_range_end'], 'number' );
         $this->render_text_row( 'online_range_start', __( 'Online range start', 'duck-race' ), (string) $race['online_range_start'], 'number' );
         $this->render_text_row( 'online_range_end', __( 'Online range end', 'duck-race' ), (string) $race['online_range_end'], 'number' );
 
-        $this->render_text_row( 'price_per_duck', __( 'Price per duck', 'duck-race' ), (string) $race['price_per_duck'], 'number', '0.01' );
-        $this->render_text_row( 'chosen_number_uplift', __( 'Chosen-number uplift', 'duck-race' ), (string) $race['chosen_number_uplift'], 'number', '0.01' );
+        $this->render_text_row( 'price_per_duck', __( 'Price per duck (£)', 'duck-race' ), (string) $race['price_per_duck'], 'number', '0.01' );
+        $this->render_text_row(
+            'chosen_number_uplift',
+            __( 'Chosen-number uplift (£)', 'duck-race' ),
+            (string) $race['chosen_number_uplift'],
+            'number',
+            '0.01',
+            __( 'Extra charge added when a buyer selects a specific duck number rather than accepting an automatically assigned one. Set to 0.00 to disable chosen numbers.', 'duck-race' )
+        );
         $this->render_text_row( 'max_ducks_per_transaction', __( 'Max ducks per transaction', 'duck-race' ), (string) $race['max_ducks_per_transaction'], 'number' );
 
         echo '</table>';
@@ -204,14 +239,18 @@ class RaceEditPage {
         return array_merge( $defaults, $row );
     }
 
-    private function render_text_row( string $name, string $label, string $value, string $type = 'text', string $step = '' ): void {
+    private function render_text_row( string $name, string $label, string $value, string $type = 'text', string $step = '', string $description = '' ): void {
         echo '<tr>';
         echo '<th scope="row"><label for="' . esc_attr( $name ) . '">' . esc_html( $label ) . '</label></th>';
         echo '<td><input class="regular-text" name="' . esc_attr( $name ) . '" id="' . esc_attr( $name ) . '" type="' . esc_attr( $type ) . '" value="' . esc_attr( $value ) . '"';
         if ( '' !== $step ) {
             echo ' step="' . esc_attr( $step ) . '"';
         }
-        echo ' /></td>';
+        echo ' />';
+        if ( '' !== $description ) {
+            echo '<p class="description">' . esc_html( $description ) . '</p>';
+        }
+        echo '</td>';
         echo '</tr>';
     }
 

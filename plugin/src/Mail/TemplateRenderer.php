@@ -33,7 +33,7 @@ class TemplateRenderer {
         $settings = get_option( 'duck_race_settings', [] );
 
         $default = match ( $template_key ) {
-            'purchase_confirmation' => '<p>Hello {first_name},</p><p>Thank you for your purchase for {race_title}.</p><p>Duck numbers: {duck_numbers}</p><p>Duck names: {duck_names}</p><p>Total paid: {purchase_total}</p>',
+            'purchase_confirmation' => '<p>Hello {first_name},</p><p>Thank you for your purchase for {race_title}.</p><p>Duck numbers: {duck_numbers}</p><p>Names for ducks: {duck_names}</p><p>Total paid: {purchase_total}</p>',
             'race_reminder' => '<p>Hello {first_name},</p><p>This is an operational reminder for {race_title} on {race_date} at {race_time}, {race_location}.</p><p>Your ducks: {duck_numbers}</p>',
             'supporter_invitation' => '<p>Hello {first_name},</p><p>You previously supported: {previous_race_result}</p><p>We would love your support again for {race_title}.</p><p><a href="{buy_link}">Buy ducks for this race</a></p>',
             'abandoned_checkout' => '<p>Hello {first_name},</p><p>Your recent checkout for {race_title} appears incomplete.</p><p>Reserved ducks: {duck_numbers}</p><p><a href="{buy_link}">Start a new checkout</a></p>',

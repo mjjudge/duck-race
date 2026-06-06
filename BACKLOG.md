@@ -190,6 +190,30 @@ At this point a Rotary club can:
 | DR-153 | Uninstall process | P1 |
 | DR-154 | Documentation | P1 |
 
+### Phase 17 - User Testing Fixes
+
+Goal: Address bugs, UX issues, and usability gaps identified during live user testing.
+
+| ID | Item | Priority |
+| --- | --- | --- |
+| DR-160 | Fix race list duplication bug in Races tab | P0 |
+| DR-161 | Move Settings tab to last position in admin navigation | P1 |
+| DR-162 | Replace "Slug" with user-friendly label in race editor | P1 |
+| DR-163 | Force dd/mm/yyyy date format throughout plugin | P1 |
+| DR-164 | Add race image upload to race editor | P2 |
+| DR-165 | Add help tooltips to all settings fields | P1 |
+| DR-166 | Make duck tile colours and text configurable in settings | P2 |
+| DR-167 | Rename "Tiles/Page" to "Ducks/Page" and update pagination options | P1 |
+| DR-168 | Rename duck grid buttons to "Lost Duck"/"Duck Found"; show only relevant button | P1 |
+| DR-169 | Rename "Reason" to "Comments"; add note icon on tiles; make comments editable/deletable | P1 |
+| DR-170 | Show all race winners on duck grid, not just 1st place | P1 |
+| DR-171 | Clarify merge tag behaviour for multiple ducks; add HTML email examples | P1 |
+| DR-172 | Add address fields and validation to contact edit form | P1 |
+| DR-173 | Add postal address to manual sale form | P1 |
+| DR-174 | Rename "Duck names" to "Names for ducks" throughout plugin | P1 |
+| DR-175 | Add in-plugin help and instructions page | P1 |
+| DR-176 | Improve winner positions table clarity in admin | P1 |
+
 ## Delivery Principle
 
 Build the full v1.1 vision progressively. MVP is not a separate reduced product; it is the point in the backlog where the system is usable for a real duck race.
@@ -879,3 +903,223 @@ Acceptance Criteria
     • Explains winner recording.
 Dependencies
 All MVP epics.
+
+EPIC 17 — User Testing Fixes
+
+DR-160 — Fix race list duplication in Races tab
+Description
+The Races tab renders the entire section twice, from the heading through to the last listed race.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Each race appears exactly once in the Races tab.
+    • The section heading is not duplicated.
+Dependencies
+DR-030.
+
+DR-161 — Move Settings tab to last position in admin navigation
+Description
+The Settings tab currently appears second in the plugin navigation. It should be the last item. All other tabs retain their current order.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings tab appears as the final item in the plugin admin navigation.
+    • All other tabs remain in their existing order.
+Dependencies
+None.
+
+DR-162 — Add explanatory help text to the Slug field in race editor
+Description
+The word "Slug" is technical jargon. Rather than replacing it, add help text that explains what it is and how it is used.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • The "Slug" label is retained.
+    • A tooltip or inline help text explains: this is the short identifier used in the race's web page address (e.g. evesham-duck-race-2026).
+    • Help text notes the field must contain only lowercase letters, numbers and hyphens.
+Dependencies
+DR-031.
+
+DR-163 — Force dd/mm/yyyy date format throughout plugin
+Description
+Dates currently display in mm/dd/yyyy format, following WordPress locale defaults. The plugin will only be used in the UK so all dates must display and be entered as dd/mm/yyyy regardless of locale.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • All date display fields use dd/mm/yyyy format.
+    • All date input/picker fields accept and display dd/mm/yyyy format.
+    • Applies consistently across: race editor, race list, manual sale form, contact records, reports, and any other date-bearing views.
+    • Underlying storage format (ISO/database) is unaffected.
+Dependencies
+DR-031, DR-043.
+
+DR-164 — Add race image upload to race editor
+Description
+Admins want to attach a venue or event image to a race for use in public-facing pages and admin context.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Admin can upload or select a race image when creating or editing a race.
+    • Image is stored against the race record.
+    • Image is displayed in the race admin view.
+    • Image is accessible via merge tag or shortcode attribute for use in public-facing content.
+Dependencies
+DR-031.
+
+DR-165 — Add help tooltips to all settings fields
+Description
+Settings fields such as "Chosen number uplift" are not self-explanatory. Every field should have hover or inline help text explaining its purpose in plain language.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Every field in the Settings page has a tooltip or visible help text.
+    • "Chosen number uplift" explains it is an additional charge added when a buyer selects a specific duck number.
+    • Help text is accessible without requiring additional clicks.
+Dependencies
+DR-082.
+
+DR-166 — Make duck tile colours and text configurable in settings
+Description
+Duck tile background and text colours are currently hardcoded. Admins should be able to adjust them to suit their branding, with the current colour scheme as the default.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings Admin can configure background colour for each duck state: available, sold, lost, reserved, winner.
+    • Settings Admin can configure text colour (black or white) per duck state independently.
+    • Current colour scheme (pale yellow / bright yellow / black / muted / gold) is preserved as the default on fresh install and upgrade.
+    • Changes apply immediately to the duck grid without requiring a page reload.
+    • No duck state colour is hardcoded in PHP or CSS after this item is complete.
+Dependencies
+DR-120, DR-082.
+
+DR-167 — Rename "Tiles/Page" to "Ducks/Page" and update pagination options
+Description
+The duck grid pagination control uses the term "Tiles" which is less intuitive. Rename and offer a wider range of page-size options.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Pagination label reads "Ducks/Page".
+    • Available page-size options are: 50, 100, 250, 400, 500.
+Dependencies
+DR-121.
+
+DR-168 — Rename duck grid buttons and show only the relevant action
+Description
+"Mark Lost" and "Restore" are less intuitive than "Lost Duck" and "Duck Found". Also, both buttons should not appear at the same time: only the contextually relevant one should be shown.
+Note: lost/found status is per physical duck and persists across races (see DR-169 for schema implications).
+Status
+    • [x] Complete
+Acceptance Criteria
+    • "Mark Lost" renamed to "Lost Duck".
+    • "Restore" renamed to "Duck Found".
+    • Only "Lost Duck" is shown when a duck is not currently in a lost state.
+    • Only "Duck Found" is shown when a duck is currently in a lost state.
+    • Lost/found state is tracked per physical duck number, not per race.
+Dependencies
+DR-122, DR-169.
+
+DR-169 — Per-duck comments and lost/found status; note icon on tiles; comments editable/deletable
+Description
+"Reason (optional)" is too narrow. Admins need a general-purpose comments field to record the physical condition or history of a duck (e.g. "damaged, needs replacing"). Comments and lost/found status belong to the physical duck, not to any purchase or race, so they must persist across races. This likely requires a new duck-physical-state table separate from the existing race-scoped duck_status table.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • "Reason (optional)" label changed to "Comments" throughout the duck grid.
+    • Comments field is present for all duck actions: Lost Duck, Duck Found, and any general update.
+    • Comments and lost/found status are stored per physical duck number and persist across all races — they are not race-scoped.
+    • It is visually clear in the UI that comments describe the duck's condition, not any buyer.
+    • A small note icon appears in the bottom-right corner of any duck tile that has a saved comment.
+    • Admin can edit existing comments.
+    • Admin can delete existing comments.
+    • All action buttons save any content in the Comments field.
+    • Schema change: a new table (or redesigned duck_status table) stores physical duck state independently of race. Migration must be versioned and idempotent.
+Dependencies
+DR-122, DR-015.
+
+DR-170 — Show all race winners on duck grid
+Description
+Currently only 1st place winners are highlighted in the winner colour on the duck grid. All winner positions should be highlighted, with position detail available on click.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • All winner duck tiles display in winner colour (not just 1st place).
+    • Clicking a winner duck tile shows the winner position and prize label in the duck detail modal.
+    • Existing duck modal is updated to include winner position and prize label where applicable.
+Dependencies
+DR-122, DR-091.
+
+DR-171 — Clarify merge tag behaviour for multiple ducks; add HTML email examples
+Description
+It is not clear how {duck_numbers} and {duck_names} render when a buyer purchases multiple ducks. Email settings should explain this and provide example HTML to help admins get started.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Email settings page explains how {duck_numbers} and {duck_names} render for multiple ducks (e.g. comma-separated list).
+    • At least one example HTML email template is provided in the email settings area.
+    • Merge tag helper list includes example expected output for single and multiple duck purchases.
+Dependencies
+DR-082, DR-080.
+
+DR-172 — Add address fields and validation to contact edit form
+Description
+The contact edit form lacks postal address fields. First name, last name and email should be clearly marked as mandatory, and fields such as phone should validate input format.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Contact edit form includes: Address Line 1, Address Line 2, Town/City, County, Postcode.
+    • Address fields are optional.
+    • First name, last name and email are marked as mandatory with an asterisk.
+    • Phone field validates to accept only valid characters (digits, spaces, +, -, parentheses).
+    • Client-side and server-side validation is applied.
+    • Validation errors are shown inline next to the relevant field.
+Dependencies
+DR-043.
+
+DR-173 — Add postal address to manual sale form
+Description
+The manual sale form does not collect a postal address. It should include the same address fields as the contact form so a complete record can be captured at point of sale.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Manual sale form includes the same address fields as DR-172.
+    • Address fields are optional.
+    • Address is saved against the contact record.
+Dependencies
+DR-050, DR-172.
+
+DR-174 — Rename "Duck names" to "Names for ducks" throughout plugin
+Description
+"Duck names" implies the buyer is naming their duck. The intent is that the buyer is purchasing on behalf of others (family members, friends) and recording who each duck belongs to. "Names for ducks" reads correctly either way.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • All labels, headings, placeholders and tooltips using "Duck names" are updated to "Names for ducks".
+    • Applies across: race editor, manual sale form, purchase shortcode, confirmation emails, and duck detail modal.
+Dependencies
+DR-060, DR-050.
+
+DR-175 — Add in-plugin help and instructions page
+Description
+The admin guide is currently only available in docs/ADMIN_GUIDE.md in the repository. Admins setting up the plugin will not necessarily have repository access. A dedicated Help tab within the plugin admin is required.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • A dedicated "Help" tab appears in the plugin admin navigation (before Settings).
+    • Content covers: race setup, manual sales, online sales, Stripe setup, GDPR/retention, and winner recording.
+    • Content is maintained in sync with docs/ADMIN_GUIDE.md.
+    • No external repository or GitHub access is required to read the documentation.
+Dependencies
+DR-154.
+
+DR-176 — Improve winner positions table clarity in admin
+Description
+The winner positions table in the admin is not easy to read. It should clearly communicate position, duck number, buyer name and prize label.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Winner positions table has clear, descriptive column headers.
+    • Each row clearly shows: position, prize label, duck number, and buyer name.
+    • Table layout is readable without horizontal scrolling on standard admin screens.
+    • Applies to both the winner configuration view and the winner recording view.
+Dependencies
+DR-090, DR-091.

@@ -53,43 +53,77 @@ class WinnerManagementPage {
             return;
         }
 
-        echo '<h2>' . esc_html__( 'Winner Positions', 'duck-race' ) . '</h2>';
+        echo '<h2>' . esc_html__( 'Step 1 — Configure Prize Positions', 'duck-race' ) . '</h2>';
+        echo '<p>' . esc_html__( '1st, 2nd and 3rd places are required. Add additional positions below if needed. Prize labels are optional (e.g. "£200 cash prize").', 'duck-race' ) . '</p>';
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
         echo '<input type="hidden" name="action" value="duck_race_save_winner_positions" />';
         echo '<input type="hidden" name="race_id" value="' . esc_attr( (string) $race_id ) . '" />';
         wp_nonce_field( self::NONCE_SAVE_POSITIONS, '_wpnonce' );
 
-        echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Position', 'duck-race' ) . '</th><th>' . esc_html__( 'Prize label (optional)', 'duck-race' ) . '</th></tr></thead><tbody>';
+        echo '<table class="widefat striped" style="max-width:600px;">';
+        echo '<thead><tr>';
+        echo '<th style="width:120px;">' . esc_html__( 'Place', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Prize label (optional)', 'duck-race' ) . '</th>';
+        echo '</tr></thead><tbody>';
+
         foreach ( $positions as $i => $position ) {
+            $ordinal = $this->ordinal( (int) $position['position'] );
             echo '<tr>';
-            echo '<td><input type="number" min="1" name="positions[' . esc_attr( (string) $i ) . '][position]" value="' . esc_attr( (string) $position['position'] ) . '" /></td>';
-            echo '<td><input class="regular-text" type="text" name="positions[' . esc_attr( (string) $i ) . '][prize_label]" value="' . esc_attr( (string) $position['prize_label'] ) . '" /></td>';
+            echo '<td>';
+            echo '<input type="number" min="1" style="width:60px;" name="positions[' . esc_attr( (string) $i ) . '][position]" value="' . esc_attr( (string) $position['position'] ) . '" /> ';
+            echo '<span style="color:#646970;">' . esc_html( $ordinal ) . '</span>';
+            echo '</td>';
+            echo '<td><input class="regular-text" type="text" name="positions[' . esc_attr( (string) $i ) . '][prize_label]" value="' . esc_attr( (string) $position['prize_label'] ) . '" placeholder="' . esc_attr__( 'e.g. £200 cash', 'duck-race' ) . '" /></td>';
             echo '</tr>';
         }
+
         for ( $extra = 0; $extra < 3; $extra++ ) {
             $idx = count( $positions ) + $extra;
+            $next_pos = $idx + 1;
             echo '<tr>';
-            echo '<td><input type="number" min="1" name="positions[' . esc_attr( (string) $idx ) . '][position]" value="" placeholder="' . esc_attr( (string) ( $idx + 1 ) ) . '" /></td>';
-            echo '<td><input class="regular-text" type="text" name="positions[' . esc_attr( (string) $idx ) . '][prize_label]" value="" /></td>';
+            echo '<td><input type="number" min="1" style="width:60px;" name="positions[' . esc_attr( (string) $idx ) . '][position]" value="" placeholder="' . esc_attr( (string) $next_pos ) . '" /></td>';
+            echo '<td><input class="regular-text" type="text" name="positions[' . esc_attr( (string) $idx ) . '][prize_label]" value="" placeholder="' . esc_attr__( 'e.g. Weekend break', 'duck-race' ) . '" /></td>';
             echo '</tr>';
         }
+
         echo '</tbody></table>';
-        submit_button( __( 'Save Winner Positions', 'duck-race' ) );
+        submit_button( __( 'Save Prize Positions', 'duck-race' ) );
         echo '</form>';
 
-        echo '<h2>' . esc_html__( 'Assign Winning Ducks', 'duck-race' ) . '</h2>';
+        if ( empty( $positions ) ) {
+            echo '</div>';
+            return;
+        }
+
+        echo '<h2>' . esc_html__( 'Step 2 — Assign Winning Duck Numbers', 'duck-race' ) . '</h2>';
+        echo '<p>' . esc_html__( 'Enter the duck number that finished in each position. Only ducks from paid purchases can be assigned as winners.', 'duck-race' ) . '</p>';
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
         echo '<input type="hidden" name="action" value="duck_race_save_winners" />';
         echo '<input type="hidden" name="race_id" value="' . esc_attr( (string) $race_id ) . '" />';
         wp_nonce_field( self::NONCE_SAVE_WINNERS, '_wpnonce' );
-        echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Position', 'duck-race' ) . '</th><th>' . esc_html__( 'Prize', 'duck-race' ) . '</th><th>' . esc_html__( 'Duck Number', 'duck-race' ) . '</th></tr></thead><tbody>';
+
+        echo '<table class="widefat striped" style="max-width:700px;">';
+        echo '<thead><tr>';
+        echo '<th style="width:100px;">' . esc_html__( 'Place', 'duck-race' ) . '</th>';
+        echo '<th style="width:200px;">' . esc_html__( 'Prize', 'duck-race' ) . '</th>';
+        echo '<th style="width:130px;">' . esc_html__( 'Duck number', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Current winner', 'duck-race' ) . '</th>';
+        echo '</tr></thead><tbody>';
+
         foreach ( $positions as $position ) {
+            $pos_num = (int) $position['position'];
+            $ordinal = $this->ordinal( $pos_num );
+            $current_duck = $this->winner_duck_for_position( $race_id, $pos_num );
+            $buyer = $current_duck > 0 ? $this->winner_buyer_for_duck( $race_id, $current_duck ) : '';
+
             echo '<tr>';
-            echo '<td>' . esc_html( (string) $position['position'] ) . '</td>';
-            echo '<td>' . esc_html( (string) $position['prize_label'] ) . '</td>';
-            echo '<td><input type="number" min="1" name="assignments[' . esc_attr( (string) $position['position'] ) . ']" value="' . esc_attr( (string) $this->winner_duck_for_position( $race_id, (int) $position['position'] ) ) . '" /></td>';
+            echo '<td><strong>' . esc_html( $ordinal ) . '</strong></td>';
+            echo '<td>' . esc_html( '' !== (string) $position['prize_label'] ? (string) $position['prize_label'] : '—' ) . '</td>';
+            echo '<td><input type="number" min="0" style="width:100px;" name="assignments[' . esc_attr( (string) $pos_num ) . ']" value="' . esc_attr( $current_duck > 0 ? (string) $current_duck : '' ) . '" placeholder="' . esc_attr__( 'Duck #', 'duck-race' ) . '" /></td>';
+            echo '<td style="color:#646970;">' . esc_html( '' !== $buyer ? $buyer : '—' ) . '</td>';
             echo '</tr>';
         }
+
         echo '</tbody></table>';
         submit_button( __( 'Save Winners', 'duck-race' ) );
         echo '</form>';
@@ -156,6 +190,46 @@ class WinnerManagementPage {
         $rows = $wpdb->get_results( "SELECT id, title FROM {$table} ORDER BY race_date DESC, id DESC" );
 
         return is_array( $rows ) ? $rows : [];
+    }
+
+    private function ordinal( int $n ): string {
+        if ( $n <= 0 ) {
+            return (string) $n;
+        }
+        $suffixes = [ 'th', 'st', 'nd', 'rd' ];
+        $mod100 = $n % 100;
+        $suffix = ( $mod100 >= 11 && $mod100 <= 13 ) ? 'th' : ( $suffixes[ min( $n % 10, 3 ) ] );
+        return $n . $suffix;
+    }
+
+    private function winner_buyer_for_duck( int $race_id, int $duck_number ): string {
+        global $wpdb;
+        $entries = Schema::table_name( 'entries' );
+        $contacts = Schema::table_name( 'contacts' );
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT c.first_name, c.last_name, c.organisation_name
+                 FROM {$entries} e
+                 LEFT JOIN {$contacts} c ON c.id = e.contact_id
+                 WHERE e.race_id = %d AND e.duck_number = %d
+                 LIMIT 1",
+                $race_id,
+                $duck_number
+            ),
+            ARRAY_A
+        );
+
+        if ( ! is_array( $row ) ) {
+            return '';
+        }
+
+        $org = trim( (string) ( $row['organisation_name'] ?? '' ) );
+        if ( '' !== $org ) {
+            return $org;
+        }
+
+        return trim( (string) ( $row['first_name'] ?? '' ) . ' ' . (string) ( $row['last_name'] ?? '' ) );
     }
 
     private function winner_duck_for_position( int $race_id, int $position ): int {

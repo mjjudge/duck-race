@@ -26,7 +26,7 @@ class DuckGridPage {
         $filter = sanitize_key( (string) ( $_GET['filter'] ?? 'all' ) );
         $search = max( 0, (int) ( $_GET['duck_number'] ?? 0 ) );
         $page = max( 1, (int) ( $_GET['grid_page'] ?? 1 ) );
-        $per_page = max( 100, min( 400, (int) ( $_GET['per_page'] ?? 250 ) ) );
+        $per_page = max( 50, min( 500, (int) ( $_GET['per_page'] ?? 250 ) ) );
 
         $data = $service->tiles( $race_id, $filter, $search, $page, $per_page );
         $race = $data['race'] ?? null;
@@ -61,9 +61,9 @@ class DuckGridPage {
         echo '<label for="duck_number"><strong>' . esc_html__( 'Duck #', 'duck-race' ) . '</strong></label> ';
         echo '<input type="number" min="0" id="duck_number" name="duck_number" value="' . esc_attr( (string) $search ) . '" style="width:100px;" /> ';
 
-        echo '<label for="per_page"><strong>' . esc_html__( 'Tiles/Page', 'duck-race' ) . '</strong></label> ';
+        echo '<label for="per_page"><strong>' . esc_html__( 'Ducks/Page', 'duck-race' ) . '</strong></label> ';
         echo '<select id="per_page" name="per_page">';
-        foreach ( [ 100, 250, 400 ] as $size ) {
+        foreach ( [ 50, 100, 250, 400, 500 ] as $size ) {
             echo '<option value="' . esc_attr( (string) $size ) . '" ' . selected( $per_page, $size, false ) . '>' . esc_html( (string) $size ) . '</option>';
         }
         echo '</select> ';
@@ -88,7 +88,7 @@ class DuckGridPage {
         $this->legend( '#dfbe00', __( 'Sold', 'duck-race' ) );
         $this->legend( '#2f2f2f', __( 'Lost', 'duck-race' ), '#fff' );
         $this->legend( '#b8c1cc', __( 'Reserved', 'duck-race' ) );
-        $this->legend( '#c25a00', __( 'Winner', 'duck-race' ) );
+        $this->legend( '#c25a00', __( 'Winner', 'duck-race' ), '#fff' );
         echo '</div>';
 
         $this->render_grid_styles();
@@ -104,8 +104,11 @@ class DuckGridPage {
                 'purchase_source' => (string) $tile['purchase_source'],
                 'duck_name' => (string) $tile['duck_name'],
                 'winner_position' => (int) $tile['winner_position'],
+                'prize_label' => (string) $tile['prize_label'],
                 'contact_name' => (string) $tile['contact_name'],
                 'organisation_name' => (string) $tile['organisation_name'],
+                'has_comment' => (bool) $tile['has_comment'],
+                'duck_comment' => (string) $tile['duck_comment'],
             ];
             if ( current_user_can( 'duck_race_manage_contacts' ) ) {
                 $detail['contact_email'] = (string) $tile['contact_email'];
@@ -115,6 +118,9 @@ class DuckGridPage {
             echo '<button type="button" class="' . $tile_class . '" data-detail="' . esc_attr( wp_json_encode( $detail ) ) . '">';
             echo '<span class="duck-race-tile__icon" aria-hidden="true"></span>';
             echo '<span class="duck-race-tile__number">' . esc_html( (string) $tile['duck_number'] ) . '</span>';
+            if ( ! empty( $tile['has_comment'] ) ) {
+                echo '<span class="duck-race-tile__note" aria-label="' . esc_attr__( 'Has comment', 'duck-race' ) . '" title="' . esc_attr__( 'This duck has a comment', 'duck-race' ) . '">&#9998;</span>';
+            }
             echo '</button>';
         }
         echo '</div>';
@@ -132,10 +138,11 @@ class DuckGridPage {
         $race_id = (int) ( $_POST['race_id'] ?? 0 );
         $duck_number = (int) ( $_POST['duck_number'] ?? 0 );
         $operation = sanitize_key( (string) ( $_POST['operation'] ?? '' ) );
+        $comment = sanitize_textarea_field( wp_unslash( (string) ( $_POST['duck_comment'] ?? '' ) ) );
         $filter = sanitize_key( (string) ( $_POST['filter'] ?? 'all' ) );
         $search = max( 0, (int) ( $_POST['duck_number_filter'] ?? 0 ) );
         $page = max( 1, (int) ( $_POST['grid_page'] ?? 1 ) );
-        $per_page = max( 100, min( 400, (int) ( $_POST['per_page'] ?? 250 ) ) );
+        $per_page = max( 50, min( 500, (int) ( $_POST['per_page'] ?? 250 ) ) );
 
         $service = new DuckGridService();
         $race = $service->get_race( $race_id );
@@ -148,24 +155,21 @@ class DuckGridPage {
         }
 
         global $wpdb;
-        $status_table = Schema::table_name( 'duck_status' );
+        $physical_table = Schema::table_name( 'duck_physical_state' );
+        $now = current_time( 'mysql', true );
+        $user_id = get_current_user_id() ?: null;
 
         if ( 'mark_lost' === $operation ) {
-            if ( ! $service->can_mark_lost( $race_id, $duck_number ) ) {
-                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, __( 'Only available ducks can be marked lost.', 'duck-race' ) );
-            }
+            $before = [ 'is_lost' => $service->is_lost( $duck_number ) ? 1 : 0 ];
 
-            $before = [ 'status' => $service->is_lost( $race_id, $duck_number ) ? 'lost' : 'available' ];
-            $now = current_time( 'mysql', true );
             $wpdb->replace(
-                $status_table,
+                $physical_table,
                 [
-                    'race_id' => $race_id,
                     'duck_number' => $duck_number,
-                    'status' => 'lost',
-                    'reason' => sanitize_text_field( (string) ( $_POST['reason'] ?? '' ) ),
+                    'is_lost' => 1,
+                    'comment' => $comment,
                     'changed_at' => $now,
-                    'changed_by' => get_current_user_id() ?: null,
+                    'changed_by' => $user_id,
                 ]
             );
 
@@ -174,7 +178,7 @@ class DuckGridPage {
                 'duck',
                 $duck_number,
                 $before,
-                [ 'status' => 'lost' ],
+                [ 'is_lost' => 1, 'comment' => $comment ],
                 [ 'race_id' => $race_id ]
             );
 
@@ -182,16 +186,43 @@ class DuckGridPage {
         }
 
         if ( 'restore' === $operation ) {
-            $before = [ 'status' => $service->is_lost( $race_id, $duck_number ) ? 'lost' : 'available' ];
-            $wpdb->delete( $status_table, [ 'race_id' => $race_id, 'duck_number' => $duck_number ] );
+            $before = [ 'is_lost' => $service->is_lost( $duck_number ) ? 1 : 0 ];
+
+            $wpdb->replace(
+                $physical_table,
+                [
+                    'duck_number' => $duck_number,
+                    'is_lost' => 0,
+                    'comment' => $comment,
+                    'changed_at' => $now,
+                    'changed_by' => $user_id,
+                ]
+            );
 
             Logger::log(
                 'duck.status_changed',
                 'duck',
                 $duck_number,
                 $before,
-                [ 'status' => 'available' ],
+                [ 'is_lost' => 0, 'comment' => $comment ],
                 [ 'race_id' => $race_id ]
+            );
+
+            $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, '', true );
+        }
+
+        if ( 'save_comment' === $operation ) {
+            $is_lost = $service->is_lost( $duck_number ) ? 1 : 0;
+
+            $wpdb->replace(
+                $physical_table,
+                [
+                    'duck_number' => $duck_number,
+                    'is_lost' => $is_lost,
+                    'comment' => $comment,
+                    'changed_at' => $now,
+                    'changed_by' => $user_id,
+                ]
             );
 
             $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, '', true );
@@ -230,7 +261,7 @@ class DuckGridPage {
 
     private function render_detail_modal( int $race_id, string $filter, int $search, int $page, int $per_page ): void {
         echo '<div id="duck-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100000;">';
-        echo '<div style="background:#fff;max-width:520px;margin:8vh auto;padding:16px;border-radius:8px;">';
+        echo '<div style="background:#fff;max-width:520px;margin:8vh auto;padding:16px;border-radius:8px;overflow-y:auto;max-height:84vh;">';
         echo '<h3 id="duck-detail-title">' . esc_html__( 'Duck Details', 'duck-race' ) . '</h3>';
         echo '<div id="duck-detail-body"></div>';
 
@@ -243,11 +274,14 @@ class DuckGridPage {
         echo '<input type="hidden" name="duck_number_filter" value="' . esc_attr( (string) $search ) . '" />';
         echo '<input type="hidden" name="grid_page" value="' . esc_attr( (string) $page ) . '" />';
         echo '<input type="hidden" name="per_page" value="' . esc_attr( (string) $per_page ) . '" />';
-        echo '<p><label for="duck-detail-reason">' . esc_html__( 'Reason (optional)', 'duck-race' ) . '</label><br />';
-        echo '<input class="regular-text" type="text" id="duck-detail-reason" name="reason" /></p>';
-        echo '<p>';
-        echo '<button type="submit" class="button" name="operation" value="mark_lost">' . esc_html__( 'Mark Lost', 'duck-race' ) . '</button> ';
-        echo '<button type="submit" class="button" name="operation" value="restore">' . esc_html__( 'Restore', 'duck-race' ) . '</button> ';
+
+        echo '<p><label for="duck-detail-comment"><strong>' . esc_html__( 'Comments', 'duck-race' ) . '</strong></label><br />';
+        echo '<textarea class="large-text" rows="3" id="duck-detail-comment" name="duck_comment" placeholder="' . esc_attr__( 'Notes about this duck\'s condition, e.g. damaged, needs replacing', 'duck-race' ) . '"></textarea></p>';
+
+        echo '<p id="duck-detail-actions">';
+        echo '<button type="submit" class="button" id="duck-btn-lost" name="operation" value="mark_lost">' . esc_html__( 'Lost Duck', 'duck-race' ) . '</button> ';
+        echo '<button type="submit" class="button" id="duck-btn-found" name="operation" value="restore">' . esc_html__( 'Duck Found', 'duck-race' ) . '</button> ';
+        echo '<button type="submit" class="button button-primary" id="duck-btn-comment" name="operation" value="save_comment">' . esc_html__( 'Save Comment', 'duck-race' ) . '</button> ';
         echo '<button type="button" class="button button-secondary" id="duck-detail-close">' . esc_html__( 'Close', 'duck-race' ) . '</button>';
         echo '</p>';
         echo '</form>';
@@ -260,24 +294,42 @@ class DuckGridPage {
         echo 'const modal=document.getElementById("duck-detail-modal");';
         echo 'const body=document.getElementById("duck-detail-body");';
         echo 'const numberInput=document.getElementById("duck-detail-number");';
+        echo 'const commentInput=document.getElementById("duck-detail-comment");';
         echo 'const closeBtn=document.getElementById("duck-detail-close");';
+        echo 'const btnLost=document.getElementById("duck-btn-lost");';
+        echo 'const btnFound=document.getElementById("duck-btn-found");';
+
         echo 'document.querySelectorAll(".duck-race-tile").forEach(function(tile){';
         echo 'tile.addEventListener("click",function(){';
         echo 'const detail=JSON.parse(tile.getAttribute("data-detail")||"{}");';
         echo 'numberInput.value=detail.duck||0;';
+        echo 'commentInput.value=detail.duck_comment||"";';
+
         echo 'let html="";';
         echo 'html+="<p><strong>Duck #:</strong> "+(detail.duck||"")+"</p>";';
         echo 'html+="<p><strong>Status:</strong> "+(detail.status||"")+"</p>";';
-        echo 'if(detail.duck_name){html+="<p><strong>Duck Name:</strong> "+detail.duck_name+"</p>";}';
+        echo 'if(detail.duck_name){html+="<p><strong>Name for duck:</strong> "+detail.duck_name+"</p>";}';
         echo 'if(detail.purchase_id){html+="<p><strong>Purchase:</strong> #"+detail.purchase_id+" ("+(detail.payment_status||"")+", "+(detail.purchase_source||"")+")</p>";}';
-        echo 'if(detail.winner_position){html+="<p><strong>Winner Position:</strong> "+detail.winner_position+"</p>";}';
+        echo 'if(detail.winner_position){';
+        echo 'let wp="<p><strong>Winner:</strong> Position "+detail.winner_position;';
+        echo 'if(detail.prize_label){wp+=" &mdash; "+detail.prize_label;}';
+        echo 'wp+="</p>";html+=wp;';
+        echo '}';
         echo 'if(detail.contact_name||detail.organisation_name){html+="<p><strong>Buyer:</strong> "+(detail.organisation_name||detail.contact_name)+"</p>";}';
         echo 'if(detail.contact_email){html+="<p><strong>Email:</strong> "+detail.contact_email+"</p>";}';
         echo 'if(detail.contact_phone){html+="<p><strong>Phone:</strong> "+detail.contact_phone+"</p>";}';
         echo 'body.innerHTML=html;';
+
+        // Show only the relevant lost/found button based on current status
+        echo 'const isLost=(detail.status==="lost");';
+        echo 'const isAvailable=(detail.status==="available");';
+        echo 'btnLost.style.display=isAvailable?"":"none";';
+        echo 'btnFound.style.display=isLost?"":"none";';
+
         echo 'modal.style.display="block";';
         echo '});';
         echo '});';
+
         echo 'closeBtn.addEventListener("click",function(){modal.style.display="none";});';
         echo 'modal.addEventListener("click",function(e){if(e.target===modal){modal.style.display="none";}});';
         echo '})();';
@@ -303,6 +355,7 @@ class DuckGridPage {
         echo '.duck-race-tile:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px;border-radius:4px;}';
         echo '.duck-race-tile__icon{width:62px;height:62px;background-color:var(--duck-color,#f0f0f0);-webkit-mask-image:url("' . $duck_icon_url . '");mask-image:url("' . $duck_icon_url . '");-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;filter:var(--duck-shadow,none);}';
         echo '.duck-race-tile__number{position:absolute;top:66%;left:50%;transform:translate(-50%,-50%);line-height:1;font-size:16px;font-weight:800;color:var(--duck-number-color,#222);text-shadow:0 0 1px rgba(255,255,255,.4);z-index:2;pointer-events:none;}';
+        echo '.duck-race-tile__note{position:absolute;bottom:2px;right:4px;font-size:12px;line-height:1;color:var(--duck-number-color,#222);z-index:3;pointer-events:none;opacity:.75;}';
         echo '.duck-race-tile--available{--duck-color:#f5ef9a;--duck-number-color:#222;}';
         echo '.duck-race-tile--sold{--duck-color:#dfbe00;--duck-number-color:#222;--duck-shadow:drop-shadow(0 0 0 #111) drop-shadow(1px 0 0 #111) drop-shadow(-1px 0 0 #111) drop-shadow(0 1px 0 #111) drop-shadow(0 -1px 0 #111);}';
         echo '.duck-race-tile--lost{--duck-color:#2f2f2f;--duck-number-color:#fff;}';
