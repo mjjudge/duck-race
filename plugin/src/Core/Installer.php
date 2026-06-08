@@ -10,6 +10,7 @@ class Installer {
         Roles::register();
         ( new \DuckRace\Database\Migrator() )->run();
         \DuckRace\Services\RetentionService::ensure_schedule();
+        \DuckRace\Services\ReservationCleanupService::ensure_schedule();
         self::create_pages();
         flush_rewrite_rules();
     }
@@ -17,10 +18,16 @@ class Installer {
     public static function deactivate(): void {
         // Roles and data are intentionally preserved on deactivation.
         \DuckRace\Services\RetentionService::clear_schedule();
+        \DuckRace\Services\ReservationCleanupService::clear_schedule();
         flush_rewrite_rules();
     }
 
-    private static function create_pages(): void {
+    /** Creates any required public pages that are missing. Returns the count created. */
+    public static function ensure_pages(): int {
+        return self::create_pages();
+    }
+
+    private static function create_pages(): int {
         $pages = [
             [
                 'title' => 'Duck Race - Buy Ducks',
@@ -39,6 +46,7 @@ class Installer {
             ],
         ];
 
+        $created = 0;
         foreach ( $pages as $page ) {
             $existing = get_page_by_path( $page['slug'] );
             if ( $existing ) {
@@ -54,6 +62,9 @@ class Installer {
                     'post_type' => 'page',
                 ]
             );
+            $created++;
         }
+
+        return $created;
     }
 }

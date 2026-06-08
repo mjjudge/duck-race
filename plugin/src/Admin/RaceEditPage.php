@@ -4,6 +4,7 @@ namespace DuckRace\Admin;
 
 use DuckRace\Database\Schema;
 use DuckRace\Security\RequestGuard;
+use DuckRace\Services\PurchaseService;
 use DuckRace\Services\RaceLifecycleService;
 
 defined( 'ABSPATH' ) || exit;
@@ -12,8 +13,11 @@ class RaceEditPage {
 
     private const NONCE_ACTION = 'duck_race_save_race';
 
+    private const DELETE_NONCE_PREFIX = 'duck_race_delete_race_';
+
     public function register(): void {
         add_action( 'admin_post_duck_race_save_race', [ $this, 'handle_save' ] );
+        add_action( 'admin_post_duck_race_delete_race', [ $this, 'handle_delete' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
     }
 
@@ -68,7 +72,7 @@ class RaceEditPage {
         $this->render_text_row( 'location', __( 'Location', 'duck-race' ), (string) $race['location'] );
         $this->render_textarea_row( 'public_description', __( 'Public description', 'duck-race' ), (string) $race['public_description'] );
         $this->render_image_row( (int) $race['image_id'] );
-        $this->render_select_row( 'status', __( 'Status', 'duck-race' ), (string) $race['status'], [ 'draft', 'open', 'closed', 'completed', 'archived' ] );
+        $this->render_select_row( 'status', __( 'Status', 'duck-race' ), (string) $race['status'], [ 'draft', 'test', 'open', 'closed', 'completed', 'archived' ] );
         $this->render_text_row(
             'sales_open_at',
             __( 'Sales open at', 'duck-race' ),
@@ -106,6 +110,29 @@ class RaceEditPage {
 
         submit_button( __( 'Save Race', 'duck-race' ) );
         echo '</form>';
+
+        if ( $is_edit ) {
+            $purchase_service = new PurchaseService();
+            $has_real         = $purchase_service->has_real_purchases( (int) $race['id'] );
+
+            echo '<hr style="margin:24px 0;" />';
+            echo '<h2>' . esc_html__( 'Delete Race', 'duck-race' ) . '</h2>';
+
+            if ( $has_real ) {
+                echo '<div class="notice notice-warning inline"><p>';
+                echo esc_html__( 'This race cannot be deleted because it has real purchase records. Archive it instead.', 'duck-race' );
+                echo '</p></div>';
+            } else {
+                echo '<p>' . esc_html__( 'This race has no real purchases. It can be permanently deleted (any test simulation purchases will also be removed).', 'duck-race' ) . '</p>';
+                echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" onsubmit="return confirm(\'' . esc_js( __( 'Permanently delete this race? This cannot be undone.', 'duck-race' ) ) . '\');">';
+                echo '<input type="hidden" name="action" value="duck_race_delete_race" />';
+                echo '<input type="hidden" name="race_id" value="' . esc_attr( (string) $race['id'] ) . '" />';
+                wp_nonce_field( self::DELETE_NONCE_PREFIX . $race['id'], '_wpnonce' );
+                echo '<p><button type="submit" class="button button-link-delete">' . esc_html__( 'Permanently Delete Race', 'duck-race' ) . '</button></p>';
+                echo '</form>';
+            }
+        }
+
         echo '</div>';
     }
 
@@ -155,6 +182,11 @@ class RaceEditPage {
                     $this->redirect_with_error( __( 'Invalid race status transition.', 'duck-race' ), $race_id );
                 }
 
+                // Leaving test mode: clear all test-simulation purchase data.
+                if ( 'test' === $current_status && 'test' !== $data['status'] && $race_id > 0 ) {
+                    ( new PurchaseService() )->delete_test_purchases( $race_id );
+                }
+
         if ( $race_id > 0 ) {
             $data['updated_at'] = $now;
             $wpdb->update( $table, $data, [ 'id' => $race_id ] );
@@ -166,6 +198,31 @@ class RaceEditPage {
         }
 
         wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-race-edit', 'id' => $race_id, 'updated' => '1' ], admin_url( 'admin.php' ) ) );
+        exit;
+    }
+
+    public function handle_delete(): void {
+        RequestGuard::require_capability( 'duck_race_manage_races' );
+
+        $race_id = (int) ( $_POST['race_id'] ?? 0 );
+        if ( $race_id <= 0 ) {
+            wp_die( esc_html__( 'Invalid race ID.', 'duck-race' ) );
+        }
+
+        RequestGuard::verify_admin_nonce( self::DELETE_NONCE_PREFIX . $race_id, '_wpnonce' );
+
+        $purchase_service = new PurchaseService();
+        if ( $purchase_service->has_real_purchases( $race_id ) ) {
+            wp_die( esc_html__( 'Cannot delete a race that has real purchase records.', 'duck-race' ) );
+        }
+
+        $purchase_service->delete_test_purchases( $race_id );
+
+        global $wpdb;
+        $wpdb->delete( Schema::table_name( 'duck_status' ), [ 'race_id' => $race_id ] );
+        $wpdb->delete( Schema::table_name( 'races' ), [ 'id' => $race_id ] );
+
+        wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-races', 'deleted' => '1' ], admin_url( 'admin.php' ) ) );
         exit;
     }
 
@@ -228,7 +285,7 @@ class RaceEditPage {
             'manual_range_end' => 499,
             'online_range_start' => 500,
             'online_range_end' => 1000,
-            'price_per_duck' => '0.00',
+            'price_per_duck' => (string) ( get_option( 'duck_race_settings', [] )['default_duck_price'] ?? '2.50' ),
             'chosen_number_uplift' => '0.00',
             'max_ducks_per_transaction' => 20,
             'image_id' => 0,

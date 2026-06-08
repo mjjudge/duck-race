@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Re-run tests automatically whenever any PHP file in plugin/src or tests changes.
+# Uses MD5 checksums polled every 2 seconds — no inotifywait required.
+cd "$(dirname "$0")/.."
+
+echo "Watching plugin/src and tests for changes. Press Ctrl-C to stop."
+last=""
+
+while true; do
+    current=$(find plugin/src tests -name "*.php" | sort | xargs md5sum 2>/dev/null | md5sum | cut -d' ' -f1)
+    if [ "$current" != "$last" ]; then
+        last="$current"
+        printf '\033[2J\033[H'   # clear screen and move cursor to top
+        echo "=== $(date '+%H:%M:%S') ==="
+        php tests/run.php
+        echo ""
+    fi
+    sleep 2
+done

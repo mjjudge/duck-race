@@ -38,8 +38,8 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 }
 
 if ( ! function_exists( 'current_time' ) ) {
-    function current_time( string $type, bool $gmt = false ): string {
-        return gmdate( 'Y-m-d H:i:s' );
+    function current_time( string $type, bool $gmt = false ) {
+        return 'timestamp' === $type ? time() : gmdate( 'Y-m-d H:i:s' );
     }
 }
 
@@ -64,3 +64,4 @@ if ( ! function_exists( 'wp_generate_password' ) ) {
 require_once __DIR__ . '/../plugin/src/Services/DuckAllocationService.php';
 require_once __DIR__ . '/../plugin/src/Services/PurchaseService.php';
 require_once __DIR__ . '/../plugin/src/Services/StripeWebhookProcessor.php';
+require_once __DIR__ . '/../plugin/src/Services/RaceLifecycleService.php';

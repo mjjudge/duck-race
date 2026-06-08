@@ -155,28 +155,43 @@ class DuckGridService {
     private function lost_numbers( int $start, int $end ): array {
         global $wpdb;
 
-        $table = Schema::table_name( 'duck_physical_state' );
-        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
-        if ( $exists !== $table ) {
+        $physical_table = Schema::table_name( 'duck_physical_state' );
+        $physical_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $physical_table ) );
+        if ( $physical_exists !== $physical_table ) {
             return $this->lost_numbers_legacy( $start, $end );
         }
 
-        $rows = $wpdb->get_col(
+        // Load ALL physical-state rows in range so we know which ducks have an explicit row.
+        $physical_rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT duck_number FROM {$table}
-                 WHERE is_lost = 1 AND duck_number BETWEEN %d AND %d",
+                "SELECT duck_number, is_lost FROM {$physical_table}
+                 WHERE duck_number BETWEEN %d AND %d",
                 $start,
                 $end
-            )
+            ),
+            ARRAY_A
         );
 
-        if ( ! is_array( $rows ) ) {
-            return [];
+        $map          = [];
+        $has_row_set  = []; // duck numbers that have any row in duck_physical_state
+
+        if ( is_array( $physical_rows ) ) {
+            foreach ( $physical_rows as $row ) {
+                $num = (int) $row['duck_number'];
+                $has_row_set[ $num ] = true;
+                if ( '1' === (string) $row['is_lost'] ) {
+                    $map[ $num ] = true;
+                }
+            }
         }
 
-        $map = [];
-        foreach ( $rows as $duck_number ) {
-            $map[ (int) $duck_number ] = true;
+        // For duck numbers with NO physical_state row, mirror is_lost_for_test() by falling
+        // back to the legacy duck_status table. This keeps the grid consistent with allocation checks.
+        $legacy = $this->lost_numbers_legacy( $start, $end );
+        foreach ( $legacy as $num => $_ ) {
+            if ( ! isset( $has_row_set[ $num ] ) ) {
+                $map[ $num ] = true;
+            }
         }
 
         return $map;

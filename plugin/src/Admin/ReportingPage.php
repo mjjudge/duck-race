@@ -2,17 +2,22 @@
 
 namespace DuckRace\Admin;
 
+use DuckRace\Audit\Logger;
+use DuckRace\Database\Schema;
 use DuckRace\Security\RequestGuard;
+use DuckRace\Services\PurchaseService;
 use DuckRace\Services\ReportingService;
 
 defined( 'ABSPATH' ) || exit;
 
 class ReportingPage {
 
-    private const EXPORT_NONCE_ACTION = 'duck_race_export_csv';
+    private const EXPORT_NONCE_ACTION  = 'duck_race_export_csv';
+    private const RESCUE_NONCE_ACTION  = 'duck_race_rescue_purchase';
 
     public function register(): void {
-        add_action( 'admin_post_duck_race_export_csv', [ $this, 'handle_export_csv' ] );
+        add_action( 'admin_post_duck_race_export_csv',      [ $this, 'handle_export_csv' ] );
+        add_action( 'admin_post_duck_race_rescue_purchase', [ $this, 'handle_rescue_purchase' ] );
     }
 
     public function render(): void {
@@ -26,6 +31,17 @@ class ReportingPage {
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__( 'Reporting & Export', 'duck-race' ) . '</h1>';
+
+        if ( isset( $_GET['rescued'] ) ) {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Purchase marked as paid. Confirmation email sent.', 'duck-race' ) . '</p></div>';
+        }
+        if ( isset( $_GET['rescue_error'] ) ) {
+            $code = (int) ( $_GET['rescue_error'] ?? 0 );
+            $msg = 2 === $code
+                ? __( 'Purchase could not be rescued — it was not in pending status.', 'duck-race' )
+                : __( 'Invalid rescue request.', 'duck-race' );
+            echo '<div class="notice notice-error"><p>' . esc_html( $msg ) . '</p></div>';
+        }
 
         echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '">';
         echo '<input type="hidden" name="page" value="duck-race-reporting" />';
@@ -75,6 +91,8 @@ class ReportingPage {
         $this->metric_row( __( 'Organisation Consent', 'duck-race' ), (string) (int) ( $totals['consent_organisation_yes'] ?? 0 ) );
         echo '</tbody></table>';
 
+        $this->render_pending_purchases_section( $race_id );
+
         echo '<h2>' . esc_html__( 'CSV Exports', 'duck-race' ) . '</h2>';
         echo '<p>' . esc_html__( 'Export selected race data as CSV.', 'duck-race' ) . '</p>';
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
@@ -92,6 +110,107 @@ class ReportingPage {
         echo '</p></form>';
 
         echo '</div>';
+    }
+
+    public function handle_rescue_purchase(): void {
+        RequestGuard::require_capability( 'duck_race_manage_sales' );
+        RequestGuard::verify_admin_nonce( self::RESCUE_NONCE_ACTION, '_wpnonce' );
+
+        $purchase_id = (int) ( $_POST['purchase_id'] ?? 0 );
+        $race_id     = (int) ( $_POST['race_id'] ?? 0 );
+
+        $redirect_base = add_query_arg( [ 'page' => 'duck-race-reporting', 'race_id' => $race_id ], admin_url( 'admin.php' ) );
+
+        if ( $purchase_id <= 0 ) {
+            wp_safe_redirect( add_query_arg( 'rescue_error', '1', $redirect_base ) );
+            exit;
+        }
+
+        $service  = new PurchaseService();
+        $purchase = $service->get_by_id( $purchase_id );
+
+        if ( ! is_object( $purchase ) || 'pending' !== (string) $purchase->payment_status ) {
+            wp_safe_redirect( add_query_arg( 'rescue_error', '2', $redirect_base ) );
+            exit;
+        }
+
+        $service->mark_paid( $purchase_id, '', 'manual_rescue' );
+
+        Logger::log(
+            'purchase.manually_rescued',
+            'purchase',
+            $purchase_id,
+            [ 'payment_status' => 'pending' ],
+            [ 'payment_status' => 'paid', 'method' => 'admin_rescue' ]
+        );
+
+        wp_safe_redirect( add_query_arg( 'rescued', '1', $redirect_base ) );
+        exit;
+    }
+
+    private function render_pending_purchases_section( int $race_id ): void {
+        global $wpdb;
+
+        $purchases_table = Schema::table_name( 'purchases' );
+        $contacts_table  = Schema::table_name( 'contacts' );
+        $entries_table   = Schema::table_name( 'entries' );
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT p.id, p.grand_total, p.created_at, p.stripe_checkout_session_id,
+                        c.first_name, c.last_name, c.email,
+                        GROUP_CONCAT(e.duck_number ORDER BY e.duck_number SEPARATOR ', ') AS duck_numbers
+                 FROM {$purchases_table} p
+                 LEFT JOIN {$contacts_table} c ON c.id = p.contact_id
+                 LEFT JOIN {$entries_table} e ON e.purchase_id = p.id AND e.entry_status = 'reserved'
+                 WHERE p.payment_status = 'pending' AND p.race_id = %d
+                 GROUP BY p.id
+                 ORDER BY p.created_at DESC",
+                $race_id
+            )
+        );
+
+        if ( empty( $rows ) ) {
+            return;
+        }
+
+        echo '<h2 style="color:#c00;">' . esc_html__( 'Pending Purchases — Action Required', 'duck-race' ) . '</h2>';
+        echo '<p>' . esc_html__( 'These purchases have not been confirmed by Stripe. If payment was collected, use "Mark as Paid" to rescue the purchase and release the duck(s). Verify in your Stripe dashboard before rescuing.', 'duck-race' ) . '</p>';
+        echo '<table class="widefat striped" style="max-width:1100px;">';
+        echo '<thead><tr>';
+        echo '<th>' . esc_html__( 'ID', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Buyer', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Duck(s)', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Amount', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Created', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Stripe Session', 'duck-race' ) . '</th>';
+        echo '<th>' . esc_html__( 'Action', 'duck-race' ) . '</th>';
+        echo '</tr></thead><tbody>';
+
+        foreach ( $rows as $row ) {
+            $name    = trim( (string) $row->first_name . ' ' . (string) $row->last_name );
+            $email   = (string) $row->email;
+            $session = (string) $row->stripe_checkout_session_id;
+            echo '<tr>';
+            echo '<td>' . esc_html( (string) $row->id ) . '</td>';
+            echo '<td>' . esc_html( $name ?: '—' ) . ( $email ? ' <br><small>' . esc_html( $email ) . '</small>' : '' ) . '</td>';
+            echo '<td>' . esc_html( (string) ( $row->duck_numbers ?: '—' ) ) . '</td>';
+            echo '<td>' . esc_html( $this->money( (float) $row->grand_total ) ) . '</td>';
+            echo '<td>' . esc_html( (string) $row->created_at ) . '</td>';
+            echo '<td>' . ( $session ? '<code>' . esc_html( $session ) . '</code>' : '—' ) . '</td>';
+            echo '<td>';
+            echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" onsubmit="return confirm(' . esc_attr( wp_json_encode( __( 'Mark this purchase as paid? Only do this if you have confirmed payment in Stripe.', 'duck-race' ) ) ) . ');">';
+            echo '<input type="hidden" name="action" value="duck_race_rescue_purchase" />';
+            echo '<input type="hidden" name="purchase_id" value="' . esc_attr( (string) $row->id ) . '" />';
+            echo '<input type="hidden" name="race_id" value="' . esc_attr( (string) $race_id ) . '" />';
+            wp_nonce_field( self::RESCUE_NONCE_ACTION, '_wpnonce' );
+            echo '<button type="submit" class="button button-primary button-small">' . esc_html__( 'Mark as Paid', 'duck-race' ) . '</button>';
+            echo '</form>';
+            echo '</td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
     }
 
     public function handle_export_csv(): void {

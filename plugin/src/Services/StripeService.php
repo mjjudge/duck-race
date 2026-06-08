@@ -9,7 +9,7 @@ class StripeService {
     /**
      * @return array{session_id:string, checkout_url:string}
      */
-    public function create_checkout_session( int $purchase_id, float $amount_gbp, string $description ): array {
+    public function create_checkout_session( int $purchase_id, float $amount_gbp, string $description, string $payment_ref = '' ): array {
         $settings = get_option( 'duck_race_settings', [] );
         $secret_key = (string) ( $settings['stripe_secret_key'] ?? '' );
 
@@ -26,6 +26,7 @@ class StripeService {
             'cancel_url' => $cancel_url,
             'client_reference_id' => (string) $purchase_id,
             'metadata[purchase_id]' => (string) $purchase_id,
+            'payment_intent_data[description]' => $payment_ref ?: $description,
             'line_items[0][quantity]' => 1,
             'line_items[0][price_data][currency]' => 'gbp',
             'line_items[0][price_data][product_data][name]' => $description,

@@ -189,16 +189,21 @@ class DuckGridPage {
         if ( 'restore' === $operation ) {
             $before = [ 'is_lost' => $service->is_lost( $duck_number ) ? 1 : 0 ];
 
+            // Write is_lost = 0 to authoritative physical-state table.
             $wpdb->replace(
                 $physical_table,
                 [
                     'duck_number' => $duck_number,
-                    'is_lost' => 0,
-                    'comment' => $comment,
-                    'changed_at' => $now,
-                    'changed_by' => $user_id,
+                    'is_lost'     => 0,
+                    'comment'     => $comment,
+                    'changed_at'  => $now,
+                    'changed_by'  => $user_id,
                 ]
             );
+
+            // Also remove any legacy duck_status row so allocation checks agree with the grid.
+            $status_table = Schema::table_name( 'duck_status' );
+            $wpdb->delete( $status_table, [ 'duck_number' => $duck_number ] );
 
             Logger::log(
                 'duck.status_changed',
@@ -292,6 +297,8 @@ class DuckGridPage {
 
         echo '<script>';
         echo '(function(){';
+        echo 'var manualSaleBase=' . wp_json_encode( admin_url( 'admin.php?page=duck-race-manual-sale' ) ) . ';';
+        echo 'var gridRaceId=' . wp_json_encode( $race_id ) . ';';
         echo 'const modal=document.getElementById("duck-detail-modal");';
         echo 'const body=document.getElementById("duck-detail-body");';
         echo 'const numberInput=document.getElementById("duck-detail-number");';
@@ -319,6 +326,14 @@ class DuckGridPage {
         echo 'if(detail.contact_name||detail.organisation_name){html+="<p><strong>Buyer:</strong> "+(detail.organisation_name||detail.contact_name)+"</p>";}';
         echo 'if(detail.contact_email){html+="<p><strong>Email:</strong> "+detail.contact_email+"</p>";}';
         echo 'if(detail.contact_phone){html+="<p><strong>Phone:</strong> "+detail.contact_phone+"</p>";}';
+        echo 'if(detail.status==="available"){';
+        echo 'var sellUrl=manualSaleBase+"&duck_number="+detail.duck+"&race_id="+gridRaceId;';
+        echo 'html+="<p><a href=\""+sellUrl+"\" class=\"button button-small\">Mark as Sold (manual sale)</a></p>";';
+        echo '}';
+        echo 'if(detail.status==="reserved"&&detail.payment_status==="pending"){';
+        echo 'var reportingUrl=' . wp_json_encode( admin_url( 'admin.php?page=duck-race-reporting' ) ) . '+"&race_id="+gridRaceId;';
+        echo 'html+="<p style=\"background:#fff3cd;padding:8px;border-left:4px solid #c00;\"><strong>Payment pending.</strong> If Stripe collected payment, go to <a href=\""+reportingUrl+"\">Reporting</a> and use <em>Mark as Paid</em> to rescue this purchase.</p>";';
+        echo '}';
         echo 'body.innerHTML=html;';
 
         // Show only the relevant lost/found button based on current status

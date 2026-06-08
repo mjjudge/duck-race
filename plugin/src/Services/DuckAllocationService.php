@@ -44,21 +44,57 @@ class DuckAllocationService {
         return ! $this->is_taken_for_test( (int) $race->id, $duck_number );
     }
 
-    public function validate_manual_number( object $race, int $duck_number ): array {
+    public function validate_manual_number( object $race, int $duck_number, bool $allow_online_range = false ): array {
         $duck_number = (int) $duck_number;
-        if ( $duck_number < (int) $race->manual_range_start || $duck_number > (int) $race->manual_range_end ) {
-            return [ false, __( 'Selected duck is outside the manual range.', 'duck-race' ) ];
+        $in_manual   = $duck_number >= (int) $race->manual_range_start && $duck_number <= (int) $race->manual_range_end;
+        $in_online   = $duck_number >= (int) $race->online_range_start && $duck_number <= (int) $race->online_range_end;
+
+        if ( ! $in_manual && ! ( $allow_online_range && $in_online ) ) {
+            return [ false, sprintf( __( 'Duck #%d is outside the allowed range.', 'duck-race' ), $duck_number ) ];
         }
 
         if ( $this->is_lost_for_test( (int) $race->id, $duck_number ) ) {
-            return [ false, __( 'Selected duck is marked unavailable/lost.', 'duck-race' ) ];
+            return [ false, sprintf( __( 'Duck #%d is marked as lost.', 'duck-race' ), $duck_number ) ];
         }
 
         if ( $this->is_taken_for_test( (int) $race->id, $duck_number ) ) {
-            return [ false, __( 'Selected duck is already sold or reserved.', 'duck-race' ) ];
+            return [ false, sprintf( __( 'Duck #%d is already sold or reserved.', 'duck-race' ), $duck_number ) ];
         }
 
         return [ true, '' ];
+    }
+
+    /**
+     * Returns the current entry status for a duck number in a race.
+     * Possible values: 'available', 'reserved', 'sold_online', 'sold_manual', 'winner', 'lost', 'out_of_range'.
+     */
+    public function get_duck_entry_status( int $race_id, int $duck_number, object $race ): string {
+        $in_manual = $duck_number >= (int) $race->manual_range_start && $duck_number <= (int) $race->manual_range_end;
+        $in_online = $duck_number >= (int) $race->online_range_start && $duck_number <= (int) $race->online_range_end;
+        if ( ! $in_manual && ! $in_online ) {
+            return 'out_of_range';
+        }
+
+        if ( $this->is_lost_for_test( $race_id, $duck_number ) ) {
+            return 'lost';
+        }
+
+        global $wpdb;
+        $table  = Schema::table_name( 'entries' );
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+        if ( $exists !== $table ) {
+            return 'available';
+        }
+
+        $status = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT entry_status FROM {$table} WHERE race_id = %d AND duck_number = %d LIMIT 1",
+                $race_id,
+                $duck_number
+            )
+        );
+
+        return is_string( $status ) ? $status : 'available';
     }
 
     protected function is_lost_for_test( int $race_id, int $duck_number ): bool {

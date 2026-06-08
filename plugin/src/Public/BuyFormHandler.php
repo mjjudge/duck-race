@@ -2,6 +2,7 @@
 
 namespace DuckRace\Public;
 
+use DuckRace\Services\DuckAllocationService;
 use DuckRace\Services\RaceService;
 
 defined( 'ABSPATH' ) || exit;
@@ -9,6 +10,12 @@ defined( 'ABSPATH' ) || exit;
 class BuyFormHandler {
 
     private const NONCE_ACTION = 'duck_race_public_buy';
+
+    /** @var bool Tracks whether form CSS has been output this request. */
+    private static bool $styles_output = false;
+
+    /** @var bool Ensures the footer script is only queued once per page. */
+    private static bool $script_queued = false;
 
     public function register(): void {
         add_shortcode( 'duck_race_buy', [ $this, 'render_shortcode' ] );
@@ -18,120 +25,611 @@ class BuyFormHandler {
         $race = $this->resolve_race();
 
         if ( null === $race ) {
-            return '<p>' . esc_html__( 'Online duck sales are currently closed for this race.', 'duck-race' ) . '</p>';
+            return '<p>' . esc_html__( 'Online duck sales are currently closed.', 'duck-race' ) . '</p>';
         }
 
+        $settings  = get_option( 'duck_race_settings', [] );
+        $org_name  = (string) ( $settings['organisation_name'] ?? '' );
+        $price_raw = (float) $race->price_per_duck;
+        $price     = number_format( $price_raw, 2 );
+        $max_ducks = max( 1, (int) $race->max_ducks_per_transaction );
+
+        // Pre-fetch available numbers so duck rows are server-rendered (no JS async needed).
+        $allocator       = new DuckAllocationService();
+        $preview_numbers = $allocator->next_available_numbers( $race, 'online', $max_ducks );
+        $available_count = count( $preview_numbers );
+
+        // Determine effective max the buyer can select.
+        $effective_max = $available_count > 0 ? min( $max_ducks, $available_count ) : 0;
+
+        $is_test         = 'test' === (string) $race->status;
+        $check_email_url = esc_url( rest_url( 'duck-race/v1/check-email' ) );
+        $duck_icon_url   = esc_url( DUCK_RACE_PLUGIN_URL . 'assets/images/lostduck.svg' );
+
+        $date_display = $this->format_race_datetime( (string) $race->race_date, (string) $race->race_time );
+        $location     = (string) $race->location;
+
         ob_start();
+
+        if ( ! self::$styles_output ) {
+            self::$styles_output = true;
+            $this->render_styles( $duck_icon_url );
+        }
         ?>
-        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="duck-race-buy-form" data-check-email-url="<?php echo esc_url( rest_url( 'duck-race/v1/check-email' ) ); ?>" aria-describedby="duck-race-form-help">
-            <input type="hidden" name="action" value="duck_race_start_checkout" />
+        <div class="duck-race-buy-wrap">
+
+        <div class="duck-race-event-header">
+            <h2 class="duck-race-event-title"><?php echo esc_html( (string) $race->title ); ?></h2>
+            <p class="duck-race-event-meta">
+                <?php if ( '' !== $location ) : ?>
+                    <span><?php echo esc_html( $location ); ?></span>
+                    <?php if ( '' !== $date_display ) : ?> &middot; <?php endif; ?>
+                <?php endif; ?>
+                <?php if ( '' !== $date_display ) : ?>
+                    <span><?php echo esc_html( $date_display ); ?></span>
+                <?php endif; ?>
+            </p>
+        </div>
+
+        <?php if ( $is_test ) : ?>
+            <div class="duck-race-test-banner" role="status">
+                <strong>TEST MODE</strong> — this is a training race. No payment will be taken.
+                Duck purchases will be cleared when the race status is changed.
+            </div>
+        <?php endif; ?>
+
+        <?php if ( isset( $_GET['error'] ) ) : ?>
+            <div class="duck-race-form-error-banner" role="alert">
+                <?php echo esc_html( sanitize_text_field( wp_unslash( (string) $_GET['error'] ) ) ); ?>
+            </div>
+        <?php endif; ?>
+
+        <form
+            method="post"
+            action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+            class="duck-race-buy-form"
+            data-check-email-url="<?php echo $check_email_url; ?>"
+            novalidate
+        >
+            <input type="hidden" name="action" value="<?php echo esc_attr( $is_test ? 'duck_race_simulate_checkout' : 'duck_race_start_checkout' ); ?>" />
             <?php wp_nonce_field( self::NONCE_ACTION, 'duck_race_nonce' ); ?>
             <input type="hidden" name="race_id" value="<?php echo esc_attr( (string) $race->id ); ?>" />
 
-            <h3><?php echo esc_html( (string) $race->title ); ?></h3>
-            <p><?php echo esc_html( (string) $race->location ); ?> | <?php echo esc_html( (string) $race->race_date ); ?></p>
-            <p id="duck-race-form-help"><?php esc_html_e( 'All required fields must be completed before checkout. Validation errors are shown below the relevant field.', 'duck-race' ); ?></p>
+            <?php /* ── Email ─────────────────────────────────────── */ ?>
+            <div class="drb-row">
+                <label for="drb-email"><?php esc_html_e( 'Your email address', 'duck-race' ); ?> <span class="drb-req" aria-hidden="true">*</span></label>
+                <input
+                    id="drb-email"
+                    class="drb-input drb-input--wide"
+                    type="email"
+                    name="email"
+                    required
+                    autocomplete="email"
+                    inputmode="email"
+                />
+            </div>
 
-            <p>
-                <label for="duck-race-duck-count"><?php esc_html_e( 'Number of ducks', 'duck-race' ); ?></label>
-                <input id="duck-race-duck-count" type="number" name="duck_count" min="1" max="<?php echo esc_attr( (string) $race->max_ducks_per_transaction ); ?>" value="1" required />
-            </p>
+            <?php /* ── Recognition banner ──────────────────────────── */ ?>
+            <div id="drb-recognition" class="drb-recognition" role="status" aria-live="polite" style="display:none;"></div>
 
-            <p>
-                <label for="duck-race-duck-names"><?php esc_html_e( 'Duck names (optional, comma separated)', 'duck-race' ); ?></label>
-                <input id="duck-race-duck-names" type="text" name="duck_names" />
-            </p>
+            <?php /* ── Name row ──────────────────────────────────── */ ?>
+            <div class="drb-row drb-two-col">
+                <div>
+                    <label for="drb-first-name"><?php esc_html_e( 'First name', 'duck-race' ); ?> <span class="drb-req" aria-hidden="true">*</span></label>
+                    <input id="drb-first-name" class="drb-input" type="text" name="first_name" required autocomplete="given-name" />
+                </div>
+                <div>
+                    <label for="drb-last-name"><?php esc_html_e( 'Surname', 'duck-race' ); ?> <span class="drb-req" aria-hidden="true">*</span></label>
+                    <input id="drb-last-name" class="drb-input" type="text" name="last_name" required autocomplete="family-name" />
+                </div>
+            </div>
 
-            <p>
-                <label for="duck-race-chosen"><?php esc_html_e( 'Choose specific online duck numbers (optional, comma separated)', 'duck-race' ); ?></label>
-                <input id="duck-race-chosen" type="text" name="chosen_numbers" />
-                <small><?php printf( esc_html__( 'Chosen number uplift: %s per duck', 'duck-race' ), esc_html( (string) $race->chosen_number_uplift ) ); ?></small>
-            </p>
+            <?php /* ── Address ───────────────────────────────────── */ ?>
+            <div class="drb-row">
+                <label for="drb-address1"><?php esc_html_e( 'Address Line 1', 'duck-race' ); ?></label>
+                <input id="drb-address1" class="drb-input" type="text" name="address_line_1" autocomplete="address-line1" />
+            </div>
+            <div class="drb-row">
+                <label for="drb-address2"><?php esc_html_e( 'Address Line 2', 'duck-race' ); ?></label>
+                <input id="drb-address2" class="drb-input" type="text" name="address_line_2" autocomplete="address-line2" />
+            </div>
+            <div class="drb-row drb-two-col">
+                <div>
+                    <label for="drb-city"><?php esc_html_e( 'Town / City', 'duck-race' ); ?></label>
+                    <input id="drb-city" class="drb-input" type="text" name="city" autocomplete="address-level2" />
+                </div>
+                <div>
+                    <label for="drb-county"><?php esc_html_e( 'County', 'duck-race' ); ?></label>
+                    <input id="drb-county" class="drb-input" type="text" name="county" autocomplete="address-level1" />
+                </div>
+            </div>
+            <div class="drb-row drb-two-col">
+                <div>
+                    <label for="drb-postcode"><?php esc_html_e( 'Postcode', 'duck-race' ); ?> <span class="drb-req" aria-hidden="true">*</span></label>
+                    <input id="drb-postcode" class="drb-input" type="text" name="postcode" required autocomplete="postal-code" style="text-transform:uppercase;" />
+                </div>
+                <div>
+                    <label for="drb-phone"><?php esc_html_e( 'Phone number', 'duck-race' ); ?></label>
+                    <input id="drb-phone" class="drb-input" type="tel" name="phone" autocomplete="tel" inputmode="tel" />
+                </div>
+            </div>
 
-            <p>
-                <label for="duck-race-email"><?php esc_html_e( 'Email', 'duck-race' ); ?></label>
-                <input id="duck-race-email" type="email" name="email" required />
-            </p>
+            <?php /* ── Duck count ───────────────────────────────── */ ?>
+            <div class="drb-row">
+                <label for="drb-duck-count"><?php esc_html_e( 'How many ducks would you like to race?', 'duck-race' ); ?> <span class="drb-req" aria-hidden="true">*</span></label>
+                <?php if ( $effective_max > 0 ) : ?>
+                <input
+                    id="drb-duck-count"
+                    class="drb-input drb-input--narrow"
+                    type="number"
+                    name="duck_count"
+                    min="1"
+                    max="<?php echo esc_attr( (string) $effective_max ); ?>"
+                    value="1"
+                    required
+                />
+                <p class="drb-hint"><?php printf( esc_html__( '£%s per duck — maximum %d per order', 'duck-race' ), esc_html( $price ), $effective_max ); ?></p>
+                <?php else : ?>
+                <p class="drb-no-ducks"><?php esc_html_e( 'Sorry, no ducks are currently available for online purchase.', 'duck-race' ); ?></p>
+                <?php endif; ?>
+            </div>
 
-            <div id="duck-race-recognition" role="status" aria-live="polite" style="display:none;"></div>
+            <?php /* ── Duck entries — server-rendered, JS controls visibility ── */ ?>
+            <?php if ( $available_count > 0 ) : ?>
+            <div class="drb-entries-section">
+                <p class="drb-entries-intro"><?php esc_html_e( 'You can give your ducks a name — great if you\'re racing one in honour of someone special:', 'duck-race' ); ?></p>
+                <div id="drb-entries" class="drb-entries-list">
+                    <?php foreach ( $preview_numbers as $i => $num ) :
+                        $hidden_class = $i > 0 ? ' drb-entry-row--hidden' : '';
+                        $disabled     = $i > 0 ? ' disabled' : '';
+                    ?>
+                    <div class="drb-entry-row<?php echo esc_attr( $hidden_class ); ?>" data-row="<?php echo esc_attr( (string) $i ); ?>">
+                        <div class="drb-duck">
+                            <span class="drb-duck__icon"></span>
+                            <span class="drb-duck__number"><?php echo esc_html( (string) $num ); ?></span>
+                        </div>
+                        <input type="hidden" name="duck_number_preview[]" value="<?php echo esc_attr( (string) $num ); ?>"<?php echo $disabled; ?> />
+                        <div class="drb-entry-name">
+                            <label for="drb-duck-name-<?php echo esc_attr( (string) $i ); ?>">
+                                <?php printf( esc_html__( 'Name for duck #%d', 'duck-race' ), $num ); ?>
+                            </label>
+                            <input
+                                id="drb-duck-name-<?php echo esc_attr( (string) $i ); ?>"
+                                type="text"
+                                name="duck_name[]"
+                                class="drb-input"
+                                placeholder="<?php esc_attr_e( 'Optional', 'duck-race' ); ?>"
+                                autocomplete="off"
+                                <?php echo $disabled; ?>
+                            />
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
-            <p>
-                <label for="duck-race-first-name"><?php esc_html_e( 'First name', 'duck-race' ); ?></label>
-                <input id="duck-race-first-name" type="text" name="first_name" required />
-            </p>
+            <?php /* ── Voluntary donation ──────────────────────── */ ?>
+            <div class="drb-row">
+                <span class="drb-label"><?php esc_html_e( 'Add a voluntary donation (optional)', 'duck-race' ); ?></span>
+                <div class="drb-donation-buttons" role="group" aria-label="<?php esc_attr_e( 'Donation amount', 'duck-race' ); ?>">
+                    <button type="button" class="drb-donation-btn" data-amount="5">£5</button>
+                    <button type="button" class="drb-donation-btn" data-amount="10">£10</button>
+                    <button type="button" class="drb-donation-btn" data-amount="15">£15</button>
+                    <button type="button" class="drb-donation-btn" data-amount="other"><?php esc_html_e( 'Other', 'duck-race' ); ?></button>
+                </div>
+                <input
+                    id="drb-donation-custom"
+                    class="drb-input drb-input--narrow"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="£0.00"
+                    autocomplete="off"
+                    style="display:none;margin-top:8px;"
+                    aria-label="<?php esc_attr_e( 'Custom donation amount', 'duck-race' ); ?>"
+                />
+                <input type="hidden" name="donation_amount" id="drb-donation" value="0" />
+            </div>
 
-            <p>
-                <label for="duck-race-last-name"><?php esc_html_e( 'Last name', 'duck-race' ); ?></label>
-                <input id="duck-race-last-name" type="text" name="last_name" required />
-            </p>
+            <?php /* ── Total ────────────────────────────────────── */ ?>
+            <div class="drb-row drb-total-row">
+                <span><?php esc_html_e( 'Total cost', 'duck-race' ); ?></span>
+                <span id="drb-total" class="drb-total-amount">£<?php echo esc_html( $price ); ?></span>
+            </div>
 
-            <fieldset>
-                <legend><?php esc_html_e( 'Communication preferences', 'duck-race' ); ?></legend>
-                <p>
-                    <label><input type="checkbox" name="consent_duck_race" value="1" /> <?php esc_html_e( 'Contact me about future duck races', 'duck-race' ); ?></label><br />
-                    <label><input type="checkbox" name="consent_organisation" value="1" /> <?php esc_html_e( 'Contact me about other organisation activities', 'duck-race' ); ?></label>
+            <?php /* ── Consent ──────────────────────────────────── */ ?>
+            <fieldset class="drb-fieldset">
+                <legend class="drb-legend"><?php esc_html_e( 'Communication preferences', 'duck-race' ); ?></legend>
+                <label class="drb-check-label">
+                    <input type="checkbox" name="consent_duck_race" value="1" id="drb-consent-duck-race" />
+                    <span><?php esc_html_e( 'Contact me about future duck races', 'duck-race' ); ?></span>
+                </label>
+                <label class="drb-check-label">
+                    <input type="checkbox" name="consent_organisation" value="1" id="drb-consent-organisation" />
+                    <span>
+                    <?php
+                    if ( '' !== $org_name ) {
+                        printf( esc_html__( 'Contact me about other %s activities', 'duck-race' ), esc_html( $org_name ) );
+                    } else {
+                        esc_html_e( 'Contact me about other organisation activities', 'duck-race' );
+                    }
+                    ?>
+                    </span>
+                </label>
+                <p id="drb-consent-imported" style="display:none;margin:6px 0 0;font-size:13px;color:#555;">
+                    <?php esc_html_e( 'Consent settings imported from your previous visit — untick to change.', 'duck-race' ); ?>
                 </p>
             </fieldset>
 
+            <?php /* ── Gift Aid ─────────────────────────────────── */ ?>
+            <fieldset class="drb-fieldset drb-gift-aid-fieldset">
+                <legend class="drb-legend"><?php esc_html_e( 'Gift Aid', 'duck-race' ); ?></legend>
+                <label class="drb-check-label">
+                    <input type="checkbox" name="gift_aid" value="1" id="drb-gift-aid" />
+                    <span>
+                        <strong><?php esc_html_e( 'Boost your contribution by 25% at no cost to you!', 'duck-race' ); ?></strong><br />
+                        <span class="drb-hint" style="margin-top:4px;display:block;">
+                            <?php esc_html_e( 'If you are a UK taxpayer, we can claim an extra 25p for every £1 you pay — on your duck entry fee and any donation — through Gift Aid.', 'duck-race' ); ?>
+                        </span>
+                    </span>
+                </label>
+                <p class="drb-gift-aid-declaration" id="drb-gift-aid-text" style="display:none;font-size:0.85em;color:#444;border-left:3px solid #dfbe00;padding:8px 12px;margin:10px 0 4px;">
+                    <?php esc_html_e( 'I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year, it is my responsibility to pay any difference. Gift Aid is reclaimed by the charity from the tax you pay for the current tax year.', 'duck-race' ); ?>
+                </p>
+                <p class="drb-hint" id="drb-gift-aid-address-note" style="display:none;">
+                    <?php esc_html_e( 'Your home address (entered above) is required for Gift Aid — please ensure it is filled in correctly.', 'duck-race' ); ?>
+                </p>
+            </fieldset>
+
+            <?php /* ── Honeypot ─────────────────────────────────── */ ?>
             <p style="display:none;" aria-hidden="true">
-                <label for="duck-race-website"><?php esc_html_e( 'Website', 'duck-race' ); ?></label>
-                <input id="duck-race-website" type="text" name="website" autocomplete="off" tabindex="-1" />
+                <label for="drb-website"><?php esc_html_e( 'Website', 'duck-race' ); ?></label>
+                <input id="drb-website" type="text" name="website" autocomplete="off" tabindex="-1" />
             </p>
 
-            <p>
-                <button type="submit"><?php esc_html_e( 'Proceed to Checkout', 'duck-race' ); ?></button>
-            </p>
+            <?php /* ── Checkout button ─────────────────────────── */ ?>
+            <div class="drb-row drb-submit-row">
+                <?php if ( $is_test ) : ?>
+                <button type="submit" class="drb-checkout-btn drb-checkout-btn--test"<?php echo $effective_max <= 0 ? ' disabled' : ''; ?>>
+                    Simulate Checkout (Test Mode)
+                </button>
+                <?php else : ?>
+                <button type="submit" class="drb-checkout-btn"<?php echo $effective_max <= 0 ? ' disabled' : ''; ?>>
+                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    <?php esc_html_e( 'Proceed to Checkout', 'duck-race' ); ?>
+                </button>
+                <?php endif; ?>
+            </div>
+
         </form>
-        <script>
-        (function () {
-            const form = document.querySelector('.duck-race-buy-form');
-            if (!form) return;
-            const emailEl = form.querySelector('#duck-race-email');
-            const firstNameEl = form.querySelector('#duck-race-first-name');
-            const lastNameEl = form.querySelector('#duck-race-last-name');
-            const recognition = form.querySelector('#duck-race-recognition');
-            const endpoint = form.getAttribute('data-check-email-url');
+        </div>
 
-            if (!emailEl || !endpoint) return;
-
-            const requiredFields = [
-                form.querySelector('#duck-race-duck-count'),
-                form.querySelector('#duck-race-email'),
-                form.querySelector('#duck-race-first-name'),
-                form.querySelector('#duck-race-last-name')
-            ].filter(Boolean);
-
-            requiredFields.forEach((field) => {
-                field.addEventListener('invalid', () => {
-                    field.setAttribute('aria-invalid', 'true');
-                });
-                field.addEventListener('input', () => {
-                    field.removeAttribute('aria-invalid');
-                    field.setCustomValidity('');
-                });
-            });
-
-            emailEl.addEventListener('blur', async () => {
-                const email = emailEl.value.trim();
-                if (!email) return;
-                try {
-                    const res = await fetch(endpoint + '?email=' + encodeURIComponent(email));
-                    const data = await res.json();
-                    if (data && data.exists) {
-                        recognition.style.display = 'block';
-                        recognition.textContent = 'Welcome back ' + (data.first_name || '') + '. We found your details from a previous duck race. Please review and update if needed.';
-                        if (firstNameEl && !firstNameEl.value) firstNameEl.value = data.first_name || '';
-                        if (lastNameEl && !lastNameEl.value) lastNameEl.value = data.last_name || '';
-                    }
-                } catch (e) {
-                    // fail silently for convenience feature
-                }
-            });
-        })();
-        </script>
         <?php
 
+        if ( $effective_max > 0 ) {
+            $this->maybe_enqueue_form_js( (int) $race->id, $price_raw, $check_email_url );
+        }
+
+
+
         return (string) ob_get_clean();
+    }
+
+    private function render_styles( string $duck_icon_url ): void {
+        ?>
+        <style>
+        .duck-race-buy-wrap{max-width:600px;margin:0 auto;font-family:inherit;}
+        .duck-race-event-header{background:#f5ef9a;border-left:4px solid #dfbe00;padding:14px 18px;margin-bottom:28px;border-radius:4px;}
+        .duck-race-event-title{margin:0 0 4px;font-size:1.45em;font-weight:700;}
+        .duck-race-event-meta{margin:0;color:#555;font-size:0.97em;}
+        .duck-race-form-error-banner{background:#fee2e2;border:1px solid #f87171;border-radius:4px;padding:10px 14px;margin-bottom:16px;color:#7f1d1d;}
+        .duck-race-buy-form .drb-row{margin-bottom:18px;}
+        .duck-race-buy-form label,.duck-race-buy-form .drb-legend{display:block;font-weight:600;margin-bottom:5px;font-size:0.93em;color:#222;}
+        .drb-req{color:#c00;margin-left:1px;}
+        .drb-input{width:100%;padding:10px 12px;border:1px solid #ccc;border-radius:4px;font-size:1em;box-sizing:border-box;background:#fff;}
+        .drb-input:focus{outline:2px solid #2563eb;outline-offset:0;border-color:#2563eb;}
+        .drb-input--wide{max-width:100%;}
+        .drb-input--narrow{max-width:120px;}
+        .drb-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+        .drb-hint{font-size:0.83em;color:#666;margin:4px 0 0;}
+        .drb-no-ducks{color:#c00;font-size:0.95em;margin:4px 0 0;}
+        .drb-recognition{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:4px;padding:10px 14px;font-size:0.9em;color:#065f46;margin-bottom:18px;}
+        .drb-entries-section{margin-bottom:18px;}
+        .drb-entries-intro{font-size:0.93em;color:#444;margin-bottom:12px;}
+        .drb-entries-list{border:1px solid #e0e0e0;border-radius:6px;padding:8px 16px;background:#fafafa;}
+        .drb-entry-row{display:flex;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid #eee;}
+        .drb-entry-row:last-child{border-bottom:none;}
+        .drb-entry-row--hidden{display:none;}
+        .drb-duck{position:relative;display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;flex-shrink:0;}
+        .drb-duck__icon{width:72px;height:72px;background-color:#f5ef9a;-webkit-mask-image:url("<?php echo esc_url( $duck_icon_url ); ?>");mask-image:url("<?php echo esc_url( $duck_icon_url ); ?>");-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;}
+        .drb-duck__number{position:absolute;top:66%;left:50%;transform:translate(-50%,-50%);font-size:15px;font-weight:800;color:#222;text-shadow:0 0 2px rgba(255,255,255,.7);line-height:1;z-index:2;pointer-events:none;}
+        .drb-entry-name{flex:1;min-width:0;}
+        .drb-entry-name label{font-weight:400;font-size:0.84em;color:#555;}
+        .drb-total-row{display:flex;align-items:baseline;justify-content:space-between;border-top:2px solid #e0e0e0;padding-top:14px;font-size:1.05em;}
+        .drb-total-amount{font-size:1.5em;font-weight:700;color:#1a1a1a;}
+        .drb-fieldset{border:1px solid #e0e0e0;border-radius:4px;padding:14px 16px;margin-bottom:18px;}
+        .drb-fieldset .drb-legend{font-size:1em;margin-bottom:10px;}
+        .drb-check-label{display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;font-size:0.95em;margin-bottom:8px;}
+        .drb-check-label input{margin-top:2px;flex-shrink:0;width:18px;height:18px;cursor:pointer;}
+        .drb-label{display:block;font-weight:600;margin-bottom:8px;font-size:0.93em;color:#222;}
+        .drb-donation-buttons{display:flex;gap:8px;flex-wrap:wrap;}
+        .drb-donation-btn{padding:8px 18px;border:2px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;font-size:0.97em;font-weight:600;color:#333;transition:border-color .15s,background .15s;}
+        .drb-donation-btn:hover{border-color:#1d4ed8;color:#1d4ed8;}
+        .drb-donation-btn.drb-donation-btn--active{border-color:#1d4ed8;background:#eff6ff;color:#1d4ed8;}
+        .drb-gift-aid-fieldset{background:#fffbeb;border-color:#dfbe00;}
+        .drb-submit-row{margin-top:8px;}
+        .drb-checkout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 32px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:1.15em;font-weight:700;cursor:pointer;letter-spacing:.01em;transition:background .15s,transform .1s;text-decoration:none;}
+        .drb-checkout-btn:hover{background:#1e40af;}
+        .drb-checkout-btn:active{transform:scale(.98);}
+        .drb-checkout-btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px;}
+        .drb-checkout-btn[disabled]{background:#93c5fd;cursor:not-allowed;}
+        .drb-checkout-btn--test{background:#d97706;}
+        .drb-checkout-btn--test:hover{background:#b45309;}
+        .duck-race-test-banner{background:#fef3c7;border:2px dashed #d97706;border-radius:4px;padding:10px 16px;margin-bottom:16px;color:#92400e;font-size:0.95em;}
+        @media(max-width:480px){.drb-two-col{grid-template-columns:1fr;}.drb-duck{width:56px;height:56px;}.drb-duck__icon{width:56px;height:56px;}.drb-duck__number{font-size:12px;}}
+        </style>
+        <?php
+    }
+
+    private function format_race_datetime( string $date, string $time ): string {
+        if ( '' === $date ) {
+            return '';
+        }
+
+        $ts = strtotime( $date );
+        if ( false === $ts ) {
+            return $date;
+        }
+
+        $day = (int) date( 'j', $ts );
+        $suffix = match ( true ) {
+            in_array( $day, [ 11, 12, 13 ], true ) => 'th',
+            $day % 10 === 1 => 'st',
+            $day % 10 === 2 => 'nd',
+            $day % 10 === 3 => 'rd',
+            default => 'th',
+        };
+
+        $formatted = $day . $suffix . ' ' . date( 'F Y', $ts );
+
+        if ( '' !== $time ) {
+            $time_ts = strtotime( $time );
+            if ( false !== $time_ts ) {
+                $formatted .= ' at ' . date( 'g:ia', $time_ts );
+            }
+        }
+
+        return $formatted;
+    }
+
+    /**
+     * Registers the form JS to run in wp_footer, bypassing the_content filters
+     * (wptexturize corrupts inline scripts by converting straight quotes to curly quotes).
+     */
+    private function maybe_enqueue_form_js( int $race_id, float $price_raw, string $check_email_url ): void {
+        if ( self::$script_queued ) {
+            return;
+        }
+        self::$script_queued = true;
+
+        $storage_key = 'drb_form_' . $race_id;
+        $price_json  = (string) json_encode( $price_raw );
+        $key_json    = (string) json_encode( $storage_key );
+        $url_json    = (string) json_encode( $check_email_url );
+
+        add_action( 'wp_footer', static function () use ( $price_json, $key_json, $url_json ) {
+            ?>
+<script>
+(function () {
+    var form     = document.querySelector(".duck-race-buy-form");
+    var countEl  = document.getElementById("drb-duck-count");
+    var totalEl  = document.getElementById("drb-total");
+    var allRows  = document.querySelectorAll("#drb-entries .drb-entry-row");
+    if (!form || !countEl || !totalEl) return;
+
+    var pricePerDuck  = <?php echo $price_json; ?>;
+    var STORAGE_KEY   = <?php echo $key_json; ?>;
+    var checkEmailUrl = <?php echo $url_json; ?>;
+
+    var donationEl    = document.getElementById("drb-donation");
+    var donationBtns  = document.querySelectorAll(".drb-donation-btn");
+    var customInput   = document.getElementById("drb-donation-custom");
+    var giftAidCb     = document.getElementById("drb-gift-aid");
+    var giftAidText   = document.getElementById("drb-gift-aid-text");
+    var giftAidNote   = document.getElementById("drb-gift-aid-address-note");
+
+    function getDonation() {
+        return parseFloat((donationEl && donationEl.value) || "0") || 0;
+    }
+
+    /* ── Row visibility + total ─────────────────────────────── */
+    function updateRows(count) {
+        count = Math.max(1, Math.min(count, allRows.length || 1));
+        for (var i = 0; i < allRows.length; i++) {
+            var show = i < count;
+            if (show) {
+                allRows[i].classList.remove("drb-entry-row--hidden");
+            } else {
+                allRows[i].classList.add("drb-entry-row--hidden");
+            }
+            var inputs = allRows[i].querySelectorAll("input");
+            for (var j = 0; j < inputs.length; j++) {
+                inputs[j].disabled = !show;
+            }
+        }
+        totalEl.textContent = "£" + (count * pricePerDuck + getDonation()).toFixed(2);
+    }
+
+    /* ── Donation buttons ────────────────────────────────────── */
+    function setActiveDonationBtn(btn) {
+        for (var b = 0; b < donationBtns.length; b++) {
+            donationBtns[b].classList.remove("drb-donation-btn--active");
+        }
+        if (btn) btn.classList.add("drb-donation-btn--active");
+    }
+
+    function updateTotal() {
+        var count = parseInt((countEl && countEl.value) || "1", 10) || 1;
+        totalEl.textContent = "£" + (count * pricePerDuck + getDonation()).toFixed(2);
+    }
+
+    for (var b = 0; b < donationBtns.length; b++) {
+        donationBtns[b].addEventListener("click", (function(btn) {
+            return function() {
+                var amount = btn.getAttribute("data-amount");
+                if (amount === "other") {
+                    setActiveDonationBtn(btn);
+                    if (customInput) {
+                        customInput.style.display = "";
+                        customInput.focus();
+                        if (donationEl) donationEl.value = customInput.value || "0";
+                    }
+                } else {
+                    setActiveDonationBtn(btn);
+                    if (customInput) customInput.style.display = "none";
+                    if (donationEl) donationEl.value = amount;
+                }
+                updateTotal();
+                saveState();
+            };
+        })(donationBtns[b]));
+    }
+
+    if (customInput) {
+        customInput.addEventListener("input", function() {
+            if (donationEl) donationEl.value = customInput.value || "0";
+            updateTotal();
+            saveState();
+        });
+    }
+
+    /* ── Gift Aid toggle ─────────────────────────────────────── */
+    if (giftAidCb) {
+        giftAidCb.addEventListener("change", function() {
+            var show = giftAidCb.checked;
+            if (giftAidText) giftAidText.style.display = show ? "" : "none";
+            if (giftAidNote) giftAidNote.style.display = show ? "" : "none";
+        });
+    }
+
+    countEl.addEventListener("input",  function () { updateRows(parseInt(countEl.value, 10) || 1); });
+    countEl.addEventListener("change", function () { updateRows(parseInt(countEl.value, 10) || 1); });
+
+    /* ── sessionStorage persistence ──────────────────────────── */
+    var fieldIds = ["drb-email","drb-first-name","drb-last-name","drb-address1","drb-address2","drb-city","drb-county","drb-postcode","drb-phone","drb-duck-count","drb-donation-custom"];
+
+    function saveState() {
+        var state = {};
+        for (var k = 0; k < fieldIds.length; k++) {
+            var el = document.getElementById(fieldIds[k]);
+            if (el) state[fieldIds[k]] = el.value;
+        }
+        if (donationEl) state["donation_amount"] = donationEl.value;
+        var cbs = form.querySelectorAll("[type=checkbox]");
+        for (var c = 0; c < cbs.length; c++) {
+            if (cbs[c].name) state["cb_" + cbs[c].name] = cbs[c].checked ? "1" : "";
+        }
+        try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    }
+
+    function restoreState() {
+        var raw = null;
+        try { raw = sessionStorage.getItem(STORAGE_KEY); } catch (e) {}
+        if (!raw) return;
+        var state = null;
+        try { state = JSON.parse(raw); } catch (e) { return; }
+        for (var k = 0; k < fieldIds.length; k++) {
+            var el = document.getElementById(fieldIds[k]);
+            if (el && state[fieldIds[k]] !== undefined) el.value = state[fieldIds[k]];
+        }
+        if (donationEl && state["donation_amount"] !== undefined) {
+            donationEl.value = state["donation_amount"];
+            // Restore the "Other" custom input if the value doesn't match a preset button.
+            var presets = ["0", "5", "10", "15"];
+            var savedAmt = state["donation_amount"];
+            if (savedAmt && presets.indexOf(savedAmt) === -1) {
+                if (customInput) { customInput.style.display = ""; customInput.value = savedAmt; }
+                // Mark "Other" button active.
+                for (var b2 = 0; b2 < donationBtns.length; b2++) {
+                    if (donationBtns[b2].getAttribute("data-amount") === "other") {
+                        setActiveDonationBtn(donationBtns[b2]);
+                    }
+                }
+            } else if (savedAmt && savedAmt !== "0") {
+                for (var b3 = 0; b3 < donationBtns.length; b3++) {
+                    if (donationBtns[b3].getAttribute("data-amount") === savedAmt) {
+                        setActiveDonationBtn(donationBtns[b3]);
+                    }
+                }
+            }
+        }
+        var cbs = form.querySelectorAll("[type=checkbox]");
+        for (var c = 0; c < cbs.length; c++) {
+            if (cbs[c].name && state["cb_" + cbs[c].name] !== undefined) {
+                cbs[c].checked = (state["cb_" + cbs[c].name] === "1");
+            }
+        }
+        // Restore Gift Aid display state.
+        if (giftAidCb && giftAidCb.checked) {
+            if (giftAidText) giftAidText.style.display = "";
+            if (giftAidNote) giftAidNote.style.display = "";
+        }
+    }
+
+    var inputs = form.querySelectorAll("input, select, textarea");
+    for (var n = 0; n < inputs.length; n++) {
+        inputs[n].addEventListener("change", saveState);
+        inputs[n].addEventListener("input",  saveState);
+    }
+    form.addEventListener("submit", function () { try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {} });
+
+    /* ── Contact recognition ─────────────────────────────────── */
+    var emailEl = document.getElementById("drb-email");
+    var recog   = document.getElementById("drb-recognition");
+
+    if (emailEl && checkEmailUrl) {
+        emailEl.addEventListener("blur", function () {
+            var email = emailEl.value.trim();
+            if (!email) return;
+            fetch(checkEmailUrl + "?email=" + encodeURIComponent(email))
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data || !data.exists) { if (recog) recog.style.display = "none"; return; }
+                    if (recog) {
+                        recog.innerHTML = "✓ Welcome back, <strong>" + escHtml(data.first_name || "") + "</strong>! We’ve pre-filled your details — please check and update if needed.";
+                        recog.style.display = "block";
+                    }
+                    var fill = {"drb-first-name":data.first_name,"drb-last-name":data.last_name,"drb-phone":data.phone,"drb-address1":data.address_line_1,"drb-address2":data.address_line_2,"drb-city":data.city,"drb-county":data.county,"drb-postcode":data.postcode};
+                    var ids = Object.keys(fill);
+                    for (var i = 0; i < ids.length; i++) {
+                        var el = document.getElementById(ids[i]);
+                        if (el && !el.value && fill[ids[i]]) el.value = fill[ids[i]];
+                    }
+                    // Pre-check consent boxes from previous record; show imported note.
+                    var cdrEl = document.getElementById("drb-consent-duck-race");
+                    var coEl  = document.getElementById("drb-consent-organisation");
+                    var cnEl  = document.getElementById("drb-consent-imported");
+                    if (cdrEl) cdrEl.checked = !!data.consent_duck_race;
+                    if (coEl)  coEl.checked  = !!data.consent_organisation;
+                    if (cnEl)  cnEl.style.display = "block";
+                    saveState();
+                })
+                .catch(function () {});
+        });
+    }
+
+    /* ── Initialise ──────────────────────────────────────────── */
+    restoreState();
+    updateRows(parseInt(countEl.value, 10) || 1);
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+})();
+</script>
+            <?php
+        }, 20 );
     }
 
     private function resolve_race(): ?object {

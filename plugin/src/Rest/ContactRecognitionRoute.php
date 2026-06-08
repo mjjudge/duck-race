@@ -45,9 +45,17 @@ class ContactRecognitionRoute {
 
         return new \WP_REST_Response(
             [
-                'exists' => true,
-                'first_name' => (string) $contact->first_name,
-                'last_name' => (string) $contact->last_name,
+                'exists'               => true,
+                'first_name'           => (string) $contact->first_name,
+                'last_name'            => (string) $contact->last_name,
+                'phone'                => (string) ( $contact->phone ?? '' ),
+                'address_line_1'       => (string) ( $contact->address_line_1 ?? '' ),
+                'address_line_2'       => (string) ( $contact->address_line_2 ?? '' ),
+                'city'                 => (string) ( $contact->city ?? '' ),
+                'county'               => (string) ( $contact->county ?? '' ),
+                'postcode'             => (string) ( $contact->postcode ?? '' ),
+                'consent_duck_race'    => (bool) ( $contact->consent_duck_race ?? false ),
+                'consent_organisation' => (bool) ( $contact->consent_organisation ?? false ),
             ],
             200
         );

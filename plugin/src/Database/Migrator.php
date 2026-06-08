@@ -25,6 +25,7 @@ class Migrator {
         '1.0.0' => Migrations\CreateDuckPhysicalStateTable::class,
         '1.1.0' => Migrations\AddCountyToContacts::class,
         '1.2.0' => Migrations\AddImageToRaces::class,
+        '1.3.0' => Migrations\AddGiftAidToPurchases::class,
     ];
 
     public function run(): void {

@@ -15,11 +15,17 @@ class SettingsPage {
     private const NONCE_ACTION = 'duck_race_save_settings';
     private const TEST_NONCE_ACTION = 'duck_race_send_test_email';
     private const RETENTION_NONCE_ACTION = 'duck_race_run_retention_now';
+    private const REPAIR_NONCE_ACTION = 'duck_race_repair_pages';
+    private const CLEAR_LOG_NONCE_ACTION = 'duck_race_clear_checkout_log';
+    private const CLEANUP_NONCE_ACTION = 'duck_race_release_stale_reservations';
 
     public function register(): void {
         add_action( 'admin_post_duck_race_save_settings', [ $this, 'handle_save' ] );
         add_action( 'admin_post_duck_race_send_test_email', [ $this, 'handle_send_test_email' ] );
         add_action( 'admin_post_duck_race_run_retention_now', [ $this, 'handle_run_retention_now' ] );
+        add_action( 'admin_post_duck_race_repair_pages', [ $this, 'handle_repair_pages' ] );
+        add_action( 'admin_post_duck_race_clear_checkout_log', [ $this, 'handle_clear_checkout_log' ] );
+        add_action( 'admin_post_duck_race_release_stale_reservations', [ $this, 'handle_release_stale_reservations' ] );
     }
 
     public function render(): void {
@@ -37,6 +43,7 @@ class SettingsPage {
         $reminder_subject = (string) ( $settings['email_race_reminder_subject'] ?? '' );
         $reminder_body = (string) ( $settings['email_race_reminder_body'] ?? '' );
         $test_email_to = (string) ( $settings['email_test_recipient'] ?? $contact_email );
+        $default_duck_price = (string) ( $settings['default_duck_price'] ?? '2.50' );
         $retention_days = (int) ( $settings['retention_non_opt_in_days'] ?? 365 );
         $confirm_uninstall_data_removal = ! empty( $settings['confirm_uninstall_data_removal'] );
         $tile_colors = $this->load_tile_colors( $settings );
@@ -84,6 +91,12 @@ class SettingsPage {
         echo '</tr>';
 
         echo '<tr>';
+        echo '<th scope="row"><label for="default_duck_price">' . esc_html__( 'Default duck price (£)', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="default_duck_price" id="default_duck_price" type="number" min="0" step="0.01" class="small-text" value="' . esc_attr( $default_duck_price ) . '" />';
+        echo '<p class="description">' . esc_html__( 'Pre-filled price per duck when creating a new race. Each race can still be adjusted individually on the Race edit page.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
         echo '<th scope="row"><label for="stripe_publishable_key">' . esc_html__( 'Stripe publishable key', 'duck-race' ) . '</label></th>';
         echo '<td><input name="stripe_publishable_key" id="stripe_publishable_key" type="text" class="regular-text" value="' . esc_attr( $publishable_key ) . '" />';
         echo '<p class="description">' . esc_html__( 'Found in your Stripe Dashboard under Developers &gt; API Keys. Starts with pk_live_ or pk_test_. This key is safe to display publicly.', 'duck-race' ) . '</p></td>';
@@ -95,10 +108,17 @@ class SettingsPage {
         echo '<p class="description">' . esc_html__( 'Found in your Stripe Dashboard under Developers &gt; API Keys. Starts with sk_live_ or sk_test_. Keep this private — never share it. Leave blank to keep the existing key.', 'duck-race' ) . '</p></td>';
         echo '</tr>';
 
+        $webhook_endpoint_url = rest_url( 'duck-race/v1/stripe-webhook' );
+        echo '<tr>';
+        echo '<th scope="row">' . esc_html__( 'Stripe webhook endpoint URL', 'duck-race' ) . '</th>';
+        echo '<td><code style="user-select:all;">' . esc_html( $webhook_endpoint_url ) . '</code>';
+        echo '<p class="description">' . esc_html__( 'Register this exact URL in Stripe Dashboard &rarr; Developers &rarr; Webhooks. Listen for the checkout.session.completed event.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
         echo '<tr>';
         echo '<th scope="row"><label for="stripe_webhook_secret">' . esc_html__( 'Stripe webhook secret', 'duck-race' ) . '</label></th>';
         echo '<td><input name="stripe_webhook_secret" id="stripe_webhook_secret" type="password" class="regular-text" value="" placeholder="' . esc_attr( $this->masked_placeholder( $webhook_secret ) ) . '" />';
-        echo '<p class="description">' . sprintf( esc_html__( 'Found in your Stripe Dashboard under Developers &gt; Webhooks after registering the endpoint %s. Starts with whsec_. Leave blank to keep the existing secret.', 'duck-race' ), '<code>/wp-json/duck-race/v1/stripe-webhook</code>' ) . '</p></td>';
+        echo '<p class="description">' . esc_html__( 'After registering the endpoint above, Stripe shows a signing secret starting with whsec_. Paste it here. Leave blank to keep the existing secret.', 'duck-race' ) . '</p></td>';
         echo '</tr>';
 
         echo '<tr>';
@@ -156,8 +176,8 @@ class SettingsPage {
         echo '<table>';
         echo '<thead><tr>';
         echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'State', 'duck-race' ) . '</th>';
-        echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'Background', 'duck-race' ) . '</th>';
-        echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'Text', 'duck-race' ) . '</th>';
+        echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'Duck Colour', 'duck-race' ) . '</th>';
+        echo '<th style="text-align:left;padding:4px 8px;">' . esc_html__( 'Text Colour', 'duck-race' ) . '</th>';
         echo '</tr></thead>';
         echo '<tbody>';
         $tile_state_labels = [
@@ -174,8 +194,8 @@ class SettingsPage {
             echo '<td style="padding:4px 8px;">' . esc_html( $label ) . '</td>';
             echo '<td style="padding:4px 8px;"><input type="color" name="tile_bg_' . esc_attr( $state ) . '" value="' . $bg . '" /></td>';
             echo '<td style="padding:4px 8px;"><select name="tile_text_' . esc_attr( $state ) . '">';
-            echo '<option value="#222222" ' . selected( $text, '#222222', false ) . '>' . esc_html__( 'Dark (#222)', 'duck-race' ) . '</option>';
-            echo '<option value="#ffffff" ' . selected( $text, '#ffffff', false ) . '>' . esc_html__( 'Light (#fff)', 'duck-race' ) . '</option>';
+            echo '<option value="#222222" ' . selected( $text, '#222222', false ) . '>' . esc_html__( 'Black', 'duck-race' ) . '</option>';
+            echo '<option value="#ffffff" ' . selected( $text, '#ffffff', false ) . '>' . esc_html__( 'White', 'duck-race' ) . '</option>';
             echo '</select></td>';
             echo '</tr>';
         }
@@ -219,6 +239,100 @@ class SettingsPage {
         wp_nonce_field( self::RETENTION_NONCE_ACTION, '_wpnonce' );
         submit_button( __( 'Run Retention Now', 'duck-race' ), 'secondary', 'submit', false );
         echo '</form>';
+        // ── Page Health ─────────────────────────────────────────────────────────
+        echo '<hr />';
+        echo '<h2>' . esc_html__( 'Page Health', 'duck-race' ) . '</h2>';
+        echo '<p>' . esc_html__( 'The plugin requires the following WordPress pages. If any are missing, use the button below to recreate them.', 'duck-race' ) . '</p>';
+
+        if ( isset( $_GET['pages_repaired'] ) ) {
+            $n = (int) $_GET['pages_repaired'];
+            echo '<div class="notice notice-success inline"><p>' . esc_html( sprintf( _n( '%d page created.', '%d pages created.', $n, 'duck-race' ), $n ) ) . ( 0 === $n ? ' ' . esc_html__( 'All required pages already existed.', 'duck-race' ) : '' ) . '</p></div>';
+        }
+
+        $required_pages = [
+            [ 'slug' => 'duck-race-buy',     'label' => 'Buy Ducks',       'shortcode' => '[duck_race_buy race="current"]' ],
+            [ 'slug' => 'duck-race-success',  'label' => 'Payment Success', 'shortcode' => '[duck_race_payment_success]' ],
+            [ 'slug' => 'duck-race-failure',  'label' => 'Payment Failure', 'shortcode' => '[duck_race_payment_failure]' ],
+        ];
+
+        echo '<table class="widefat striped" style="max-width:700px;">';
+        echo '<thead><tr><th>' . esc_html__( 'Page', 'duck-race' ) . '</th><th>' . esc_html__( 'Slug', 'duck-race' ) . '</th><th>' . esc_html__( 'Status', 'duck-race' ) . '</th></tr></thead><tbody>';
+        foreach ( $required_pages as $pg ) {
+            $existing = get_page_by_path( $pg['slug'] );
+            if ( $existing ) {
+                $status = '<span style="color:#2e7d32;">&#10003; ' . esc_html__( 'Exists', 'duck-race' ) . '</span> &mdash; <a href="' . esc_url( get_permalink( $existing->ID ) ) . '" target="_blank">' . esc_html__( 'View', 'duck-race' ) . '</a> | <a href="' . esc_url( get_edit_post_link( $existing->ID ) ) . '">' . esc_html__( 'Edit', 'duck-race' ) . '</a>';
+            } else {
+                $status = '<span style="color:#c62828;">&#10007; ' . esc_html__( 'Missing', 'duck-race' ) . '</span>';
+            }
+            echo '<tr><td>' . esc_html( $pg['label'] ) . '<br><code style="font-size:11px;">' . esc_html( $pg['shortcode'] ) . '</code></td><td><code>' . esc_html( $pg['slug'] ) . '</code></td><td>' . $status . '</td></tr>';
+        }
+        echo '</tbody></table>';
+
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="margin-top:12px;">';
+        echo '<input type="hidden" name="action" value="duck_race_repair_pages" />';
+        wp_nonce_field( self::REPAIR_NONCE_ACTION, '_wpnonce' );
+        submit_button( __( 'Create Missing Pages', 'duck-race' ), 'secondary', 'submit', false );
+        echo '</form>';
+
+        // ── Stale Reservation Cleanup ────────────────────────────────────────────
+        echo '<hr />';
+        echo '<h2>' . esc_html__( 'Stale Reservation Cleanup', 'duck-race' ) . '</h2>';
+        echo '<p>' . esc_html__( 'Ducks are reserved when a buyer reaches checkout but does not complete payment. A WP-Cron job releases these automatically every hour. Use the button below to release stale reservations immediately — only reservations older than 2 hours are released to avoid disrupting any in-progress purchases.', 'duck-race' ) . '</p>';
+
+        if ( isset( $_GET['reservations_released'] ) ) {
+            $n = (int) $_GET['reservations_released'];
+            echo '<div class="notice notice-success inline"><p>' . esc_html( sprintf( _n( '%d stale reservation released.', '%d stale reservations released.', $n, 'duck-race' ), $n ) ) . ( 0 === $n ? ' ' . esc_html__( 'No reservations were old enough to release.', 'duck-race' ) : '' ) . '</p></div>';
+        }
+
+        // Show current stale count (>2h pending purchases)
+        global $wpdb;
+        $purchase_table_name = \DuckRace\Database\Schema::table_name( 'purchases' );
+        $stale_count = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$purchase_table_name} WHERE payment_status = 'pending' AND created_at <= %s",
+                gmdate( 'Y-m-d H:i:s', time() - 7200 )
+            )
+        );
+        echo '<p>' . sprintf(
+            esc_html__( 'Currently stale (pending &gt; 2 hours): %d purchase(s).', 'duck-race' ),
+            $stale_count
+        ) . '</p>';
+
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+        echo '<input type="hidden" name="action" value="duck_race_release_stale_reservations" />';
+        wp_nonce_field( self::CLEANUP_NONCE_ACTION, '_wpnonce' );
+        submit_button( __( 'Release Stale Reservations Now', 'duck-race' ), 'secondary', 'submit', false );
+        echo '</form>';
+
+        // ── Checkout Error Log ───────────────────────────────────────────────────
+        echo '<hr />';
+        echo '<h2>' . esc_html__( 'Checkout Error Log', 'duck-race' ) . '</h2>';
+        echo '<p>' . esc_html__( 'Last 20 checkout failures. Use this to diagnose why buyers are being redirected to the failure page.', 'duck-race' ) . '</p>';
+
+        $error_log = (array) get_option( 'duck_race_checkout_error_log', [] );
+        if ( empty( $error_log ) ) {
+            echo '<p><em>' . esc_html__( 'No checkout errors recorded.', 'duck-race' ) . '</em></p>';
+        } else {
+            echo '<table class="widefat striped" style="max-width:900px;">';
+            echo '<thead><tr><th>' . esc_html__( 'Time', 'duck-race' ) . '</th><th>' . esc_html__( 'Reason', 'duck-race' ) . '</th><th>' . esc_html__( 'Race ID', 'duck-race' ) . '</th><th>' . esc_html__( 'Email', 'duck-race' ) . '</th><th>' . esc_html__( 'Duck count', 'duck-race' ) . '</th></tr></thead><tbody>';
+            foreach ( $error_log as $entry ) {
+                echo '<tr>';
+                echo '<td>' . esc_html( (string) ( $entry['time'] ?? '' ) ) . '</td>';
+                echo '<td><strong>' . esc_html( (string) ( $entry['reason'] ?? '' ) ) . '</strong></td>';
+                echo '<td>' . esc_html( (string) ( $entry['race_id'] ?? '' ) ) . '</td>';
+                echo '<td>' . esc_html( (string) ( $entry['email'] ?? '' ) ) . '</td>';
+                echo '<td>' . esc_html( (string) ( $entry['duck_count'] ?? '' ) ) . '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+
+            echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="margin-top:8px;">';
+            echo '<input type="hidden" name="action" value="duck_race_clear_checkout_log" />';
+            wp_nonce_field( self::CLEAR_LOG_NONCE_ACTION, '_wpnonce' );
+            submit_button( __( 'Clear Error Log', 'duck-race' ), 'delete', 'submit', false );
+            echo '</form>';
+        }
+
         echo '<hr />';
         echo '<h2>' . esc_html__( 'Documentation', 'duck-race' ) . '</h2>';
         echo '<p>' . sprintf(
@@ -244,6 +358,7 @@ class SettingsPage {
         $purchase_body = wp_kses_post( wp_unslash( $_POST['email_purchase_confirmation_body'] ?? '' ) );
         $reminder_subject = sanitize_text_field( wp_unslash( $_POST['email_race_reminder_subject'] ?? '' ) );
         $reminder_body = wp_kses_post( wp_unslash( $_POST['email_race_reminder_body'] ?? '' ) );
+        $default_duck_price = number_format( max( 0.0, (float) ( $_POST['default_duck_price'] ?? 2.50 ) ), 2, '.', '' );
         $retention_days = max( 30, min( 3650, (int) ( $_POST['retention_non_opt_in_days'] ?? (int) ( $existing['retention_non_opt_in_days'] ?? 365 ) ) ) );
         $confirm_uninstall_data_removal = isset( $_POST['confirm_uninstall_data_removal'] ) ? 1 : 0;
 
@@ -280,6 +395,7 @@ class SettingsPage {
                 'email_race_reminder_subject' => $reminder_subject,
                 'email_race_reminder_body' => $reminder_body,
                 'email_test_recipient' => sanitize_email( wp_unslash( $_POST['email_test_recipient'] ?? (string) ( $existing['email_test_recipient'] ?? '' ) ) ),
+                'default_duck_price' => $default_duck_price,
                 'retention_non_opt_in_days' => $retention_days,
                 'confirm_uninstall_data_removal' => $confirm_uninstall_data_removal,
                 'tile_colors' => $tile_colors_saved,
@@ -377,6 +493,37 @@ class SettingsPage {
             }
         }
         return $defaults;
+    }
+
+    public function handle_release_stale_reservations(): void {
+        RequestGuard::require_capability( 'duck_race_manage_settings' );
+        RequestGuard::verify_admin_nonce( self::CLEANUP_NONCE_ACTION, '_wpnonce' );
+
+        $released = ( new \DuckRace\Services\ReservationCleanupService() )->release_stale( 7200 );
+
+        wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-settings', 'reservations_released' => $released ], admin_url( 'admin.php' ) ) );
+        exit;
+    }
+
+    public function handle_repair_pages(): void {
+        RequestGuard::require_capability( 'duck_race_manage_settings' );
+        RequestGuard::verify_admin_nonce( self::REPAIR_NONCE_ACTION, '_wpnonce' );
+
+        $created = \DuckRace\Core\Installer::ensure_pages();
+        flush_rewrite_rules();
+
+        wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-settings', 'pages_repaired' => $created ], admin_url( 'admin.php' ) ) );
+        exit;
+    }
+
+    public function handle_clear_checkout_log(): void {
+        RequestGuard::require_capability( 'duck_race_manage_settings' );
+        RequestGuard::verify_admin_nonce( self::CLEAR_LOG_NONCE_ACTION, '_wpnonce' );
+
+        delete_option( 'duck_race_checkout_error_log' );
+
+        wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-settings' ], admin_url( 'admin.php' ) ) );
+        exit;
     }
 
     private function masked_placeholder( string $secret ): string {

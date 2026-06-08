@@ -82,7 +82,8 @@ class PurchaseService {
         array $duck_names,
         float $total_duck_amount,
         float $chosen_uplift_total,
-        float $donation_amount
+        float $donation_amount,
+        bool $gift_aid_declared = false
     ): int {
         global $wpdb;
         $purchases_table = Schema::table_name( 'purchases' );
@@ -103,6 +104,7 @@ class PurchaseService {
                 'donation_amount' => number_format( $donation_amount, 2, '.', '' ),
                 'grand_total' => $grand_total,
                 'currency' => 'GBP',
+                'gift_aid_declared' => $gift_aid_declared ? 1 : 0,
                 'created_at' => $now,
             ]
         );
@@ -180,5 +182,100 @@ class PurchaseService {
         $row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $purchase_id ) );
 
         return is_object( $row ) ? $row : null;
+    }
+
+    /**
+     * @param array<int, int>    $duck_numbers
+     * @param array<int, string> $duck_names
+     */
+    public function create_test_simulation(
+        int $race_id,
+        int $contact_id,
+        array $duck_numbers,
+        array $duck_names,
+        float $total_duck_amount
+    ): int {
+        global $wpdb;
+        $purchases_table = Schema::table_name( 'purchases' );
+        $entries_table   = Schema::table_name( 'entries' );
+
+        $now = current_time( 'mysql', true );
+
+        $wpdb->insert(
+            $purchases_table,
+            [
+                'race_id'                    => $race_id,
+                'contact_id'                 => $contact_id,
+                'purchase_source'            => 'test_simulation',
+                'payment_status'             => 'pending',
+                'total_duck_amount'          => number_format( $total_duck_amount, 2, '.', '' ),
+                'chosen_number_uplift_total' => '0.00',
+                'donation_amount'            => '0.00',
+                'grand_total'                => number_format( $total_duck_amount, 2, '.', '' ),
+                'currency'                   => 'GBP',
+                'gift_aid_declared'          => 0,
+                'created_at'                 => $now,
+            ]
+        );
+
+        $purchase_id = (int) $wpdb->insert_id;
+
+        foreach ( $duck_numbers as $idx => $duck_number ) {
+            $wpdb->insert(
+                $entries_table,
+                [
+                    'race_id'      => $race_id,
+                    'purchase_id'  => $purchase_id,
+                    'contact_id'   => $contact_id,
+                    'duck_number'  => (int) $duck_number,
+                    'duck_name'    => sanitize_text_field( $duck_names[ $idx ] ?? '' ),
+                    'entry_status' => 'reserved',
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
+                ]
+            );
+        }
+
+        ( new ContactService() )->touch_last_purchase( $contact_id );
+
+        return $purchase_id;
+    }
+
+    public function delete_test_purchases( int $race_id ): int {
+        global $wpdb;
+        $purchases_table = Schema::table_name( 'purchases' );
+        $entries_table   = Schema::table_name( 'entries' );
+
+        $purchase_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT id FROM {$purchases_table} WHERE race_id = %d AND purchase_source = 'test_simulation'",
+                $race_id
+            )
+        );
+
+        if ( ! empty( $purchase_ids ) ) {
+            $placeholders = implode( ',', array_fill( 0, count( $purchase_ids ), '%d' ) );
+            // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+            $wpdb->query( $wpdb->prepare( "DELETE FROM {$entries_table} WHERE purchase_id IN ({$placeholders})", ...$purchase_ids ) );
+        }
+
+        return (int) $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$purchases_table} WHERE race_id = %d AND purchase_source = 'test_simulation'",
+                $race_id
+            )
+        );
+    }
+
+    public function has_real_purchases( int $race_id ): bool {
+        global $wpdb;
+        $table = Schema::table_name( 'purchases' );
+
+        return (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table} WHERE race_id = %d AND purchase_source != 'test_simulation'",
+                $race_id
+            )
+        ) > 0;
     }
 }

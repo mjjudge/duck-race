@@ -117,6 +117,93 @@ class ContactService {
     }
 
     /**
+     * Anonymise a contact for GDPR deletion.
+     *
+     * If the contact has Gift Aid declarations, name + address are kept for
+     * HMRC compliance (6-year retention requirement). All other PII is cleared.
+     * If no Gift Aid, all PII fields are removed.
+     *
+     * Purchase and entry records are preserved for financial audit; the contact
+     * row becomes an anonymised placeholder linked to those records.
+     *
+     * @return array{success:bool, gift_aid:bool, kept:string}|array{success:bool, reason:string}
+     */
+    public function anonymise( int $contact_id ): array {
+        global $wpdb;
+        $contacts_table  = Schema::table_name( 'contacts' );
+        $purchases_table = Schema::table_name( 'purchases' );
+
+        $contact = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$contacts_table} WHERE id = %d", $contact_id ) );
+        if ( ! $contact ) {
+            return [ 'success' => false, 'reason' => 'Contact not found.' ];
+        }
+
+        $has_gift_aid = (bool) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$purchases_table} WHERE contact_id = %d AND gift_aid_declared = 1",
+                $contact_id
+            )
+        );
+
+        $anon_email = 'anonymised_' . $contact_id . '@gdpr.removed';
+        $now        = current_time( 'mysql', true );
+
+        if ( $has_gift_aid ) {
+            // HMRC requires donor name + home address for Gift Aid records for 6 years.
+            $update = [
+                'email'                => $anon_email,
+                'phone'                => '',
+                'address_line_2'       => '',
+                'county'               => '',
+                'country'              => '',
+                'organisation_name'    => '',
+                'consent_duck_race'    => 0,
+                'consent_organisation' => 0,
+                'notes'                => '',
+                'updated_at'           => $now,
+            ];
+            $kept = 'Name and home address retained for HMRC / Gift Aid compliance.';
+        } else {
+            $update = [
+                'first_name'           => 'Anonymised',
+                'last_name'            => '',
+                'email'                => $anon_email,
+                'phone'                => '',
+                'organisation_name'    => '',
+                'address_line_1'       => '',
+                'address_line_2'       => '',
+                'city'                 => '',
+                'county'               => '',
+                'postcode'             => '',
+                'country'              => '',
+                'consent_duck_race'    => 0,
+                'consent_organisation' => 0,
+                'notes'                => '',
+                'updated_at'           => $now,
+            ];
+            $kept = 'No personal data retained.';
+        }
+
+        $before = $this->snapshot( (array) $contact );
+        $wpdb->update( $contacts_table, $update, [ 'id' => $contact_id ] );
+        $after = $this->snapshot( array_merge( (array) $contact, $update ) );
+
+        Logger::log(
+            'contact.anonymised',
+            'contact',
+            $contact_id,
+            $before,
+            $after,
+            [
+                'consent_source'    => 'admin_gdpr_delete',
+                'gift_aid_retained' => $has_gift_aid ? 'yes' : 'no',
+            ]
+        );
+
+        return [ 'success' => true, 'gift_aid' => $has_gift_aid, 'kept' => $kept ];
+    }
+
+    /**
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */
