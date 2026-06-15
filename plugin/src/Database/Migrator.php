@@ -26,6 +26,7 @@ class Migrator {
         '1.1.0' => Migrations\AddCountyToContacts::class,
         '1.2.0' => Migrations\AddImageToRaces::class,
         '1.3.0' => Migrations\AddGiftAidToPurchases::class,
+        '1.4.0' => Migrations\AddRefundColumnsToPurchases::class,
     ];
 
     public function run(): void {

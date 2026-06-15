@@ -214,6 +214,17 @@ Goal: Address bugs, UX issues, and usability gaps identified during live user te
 | DR-175 | Add in-plugin help and instructions page | P1 |
 | DR-176 | Improve winner positions table clarity in admin | P1 |
 
+### Phase 18 - Refunds
+
+| ID | Item | Priority |
+| --- | --- | --- |
+| DR-180 | Add duck_race_process_refunds capability | P1 |
+| DR-181 | Add refund columns to purchases table (migration) | P1 |
+| DR-182 | Build RefundService (Stripe + manual) | P1 |
+| DR-183 | Add admin Refunds page and process refund action | P1 |
+| DR-184 | Handle charge.refunded Stripe webhook event | P1 |
+| DR-185 | Send refund confirmation email to buyer | P2 |
+
 ## Delivery Principle
 
 Build the full v1.1 vision progressively. MVP is not a separate reduced product; it is the point in the backlog where the system is usable for a real duck race.
@@ -1123,3 +1134,94 @@ Acceptance Criteria
     • Applies to both the winner configuration view and the winner recording view.
 Dependencies
 DR-090, DR-091.
+
+EPIC 18 — Refunds
+
+DR-180 — Add duck_race_process_refunds capability
+Description
+Add a dedicated capability for processing refunds. This is a financial action so it is restricted to the Settings Admin role and WP administrators. Duck Race Managers and auto-granted Editors do not receive this capability.
+Status
+    • [ ] Not started
+Acceptance Criteria
+    • duck_race_process_refunds is added to ALL_CAPS.
+    • duck_race_settings_admin role receives the capability (true).
+    • duck_race_manager role does not receive it (false).
+    • WP administrator role receives it via register().
+    • The boot() filter for editors does not grant it.
+Dependencies
+DR-020.
+
+DR-181 — Add refund columns to purchases table
+Description
+The purchases table needs four new columns to record refund details: stripe_refund_id, refunded_at, refunded_amount, and refund_reason. A versioned migration adds them using dbDelta.
+Status
+    • [ ] Not started
+Acceptance Criteria
+    • Migration class AddRefundColumnsToPurchases uses dbDelta on the full CREATE TABLE definition.
+    • Adds: stripe_refund_id VARCHAR(191) NULL, refunded_at DATETIME NULL, refunded_amount DECIMAL(10,2) NULL, refund_reason VARCHAR(255) NULL.
+    • Migration is registered in Migrator at version 1.4.0.
+    • Plugin version is bumped to 0.18.0.
+    • Running the migration twice is safe.
+Dependencies
+DR-013, DR-181 depends on DR-180 being merged first.
+
+DR-182 — Build RefundService
+Description
+A dedicated service that handles the refund logic for both online (Stripe) and manual purchases.
+Status
+    • [ ] Not started
+Acceptance Criteria
+    • process(int $purchase_id, string $reason): array{ok:bool, error?:string} method.
+    • Validates purchase exists and has payment_status = 'paid'.
+    • For online purchases: calls Stripe Refunds API (POST /v1/refunds) using stripe_charge_id or stripe_payment_intent_id.
+    • For manual purchases: skips Stripe API and proceeds to mark as refunded.
+    • On success: calls PurchaseService::mark_refunded().
+    • Returns error string on Stripe API failure without changing DB state.
+Dependencies
+DR-181, DR-072.
+
+DR-183 — Add admin Refunds page and process refund action
+Description
+A dedicated Refunds submenu page gated by duck_race_process_refunds. Admin can select a race, see paid purchases, and issue refunds with a reason. Also shows already-refunded purchases for the race.
+Status
+    • [ ] Not started
+Acceptance Criteria
+    • Page is registered as a hidden submenu (no nav entry unless user has capability).
+    • Shows race selector at the top.
+    • Lists paid purchases: buyer name, duck numbers, amount, source (online/manual), paid date.
+    • Each online or manual paid purchase has a Refund button.
+    • Refund form includes optional reason field and JavaScript confirmation.
+    • On success: redirects with success notice and purchase is shown as refunded.
+    • On failure: redirects with error notice and purchase remains unchanged.
+    • Already-refunded purchases are shown in a separate section with refund amount and date.
+    • PurchaseService::mark_refunded() voids all duck entries and records audit log entry.
+Dependencies
+DR-182.
+
+DR-184 — Handle charge.refunded Stripe webhook event
+Description
+When a refund is issued from the Stripe dashboard rather than via the plugin, Stripe sends a charge.refunded event. The webhook processor must handle this idempotently.
+Status
+    • [ ] Not started
+Acceptance Criteria
+    • StripeWebhookProcessor handles charge.refunded event type.
+    • Finds purchase by stripe_charge_id stored on the purchase record.
+    • If purchase is already refunded, returns 200 without changing state.
+    • If purchase is paid, calls PurchaseService::mark_refunded() with the Stripe refund ID and amount.
+    • Returns 200 for unknown purchases (Stripe may send events for non-plugin charges).
+Dependencies
+DR-182, DR-072.
+
+DR-185 — Send refund confirmation email to buyer
+Description
+When a refund is processed, send the buyer a confirmation email listing the refunded amount and the duck numbers that have been released.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Email is sent after a successful refund (both admin-initiated and webhook-initiated).
+    • Includes: buyer name, refund amount, duck numbers, race name.
+    • Uses existing email template renderer and mail system.
+    • Email send is logged in the email log.
+    • Failure to send email does not roll back the refund.
+Dependencies
+DR-182, DR-080.

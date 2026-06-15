@@ -44,6 +44,30 @@ class EmailService {
         return $ok;
     }
 
+    public function send_refund_confirmation( int $purchase_id, float $refund_amount ): bool {
+        $context = $this->purchase_context( $purchase_id );
+        if ( null === $context ) {
+            return false;
+        }
+
+        $context['refund_amount'] = '£' . number_format( $refund_amount, 2 );
+
+        $renderer = new TemplateRenderer();
+        $subject  = $renderer->render_subject( 'refund_confirmation', $context );
+        $body     = $renderer->render_body( 'refund_confirmation', $context );
+
+        return ( new Mailer() )->send(
+            [
+                'to'          => (string) $context['email'],
+                'subject'     => $subject,
+                'body'        => $body,
+                'email_type'  => 'refund_confirmation',
+                'race_id'     => (int) $context['race_id'],
+                'purchase_id' => $purchase_id,
+            ]
+        );
+    }
+
     public function send_race_reminder( int $race_id ): int {
         global $wpdb;
 

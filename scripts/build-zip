@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Produces dist/duck-race-<version>.zip ready for WordPress upload.
+# Run from any directory: scripts/build-zip
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PLUGIN_DIR="$REPO_ROOT/plugin"
+ENTRY_FILE="$PLUGIN_DIR/duck-race.php"
+
+# Read version from the plugin header.
+VERSION=$(grep -m1 'Version:' "$ENTRY_FILE" | sed 's/.*Version:[[:space:]]*//' | tr -d '[:space:]')
+if [[ -z "$VERSION" ]]; then
+  echo "ERROR: Could not read version from $ENTRY_FILE" >&2
+  exit 1
+fi
+
+DIST_DIR="$REPO_ROOT/dist"
+ZIP_NAME="duck-race-${VERSION}.zip"
+ZIP_PATH="$DIST_DIR/$ZIP_NAME"
+
+mkdir -p "$DIST_DIR"
+
+# Build into a temp directory so the zip folder is named duck-race/.
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+cp -r "$PLUGIN_DIR" "$TMP_DIR/duck-race"
+
+# Remove files that should not ship.
+rm -f  "$TMP_DIR/duck-race/README.md"
+find   "$TMP_DIR/duck-race" -name '.gitkeep' -delete
+find   "$TMP_DIR/duck-race" -name '.DS_Store' -delete
+
+(cd "$TMP_DIR" && zip -r "$ZIP_PATH" duck-race/ -x "*.git*")
+
+echo "Built: $ZIP_PATH"

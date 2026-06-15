@@ -21,6 +21,7 @@ class Roles {
             'duck_race_manage_contacts' => true,
             'duck_race_manage_winners' => true,
             'duck_race_manage_settings' => false,
+            'duck_race_process_refunds' => false,
         ],
         'duck_race_settings_admin' => [
             'read' => true,
@@ -31,6 +32,7 @@ class Roles {
             'duck_race_manage_contacts' => true,
             'duck_race_manage_winners' => true,
             'duck_race_manage_settings' => true,
+            'duck_race_process_refunds' => true,
         ],
     ];
 
@@ -42,7 +44,32 @@ class Roles {
         'duck_race_manage_contacts',
         'duck_race_manage_winners',
         'duck_race_manage_settings',
+        'duck_race_process_refunds',
     ];
+
+    /**
+     * Register runtime hooks. Must be called on every page load (not just activation).
+     * Grants duck_race_manager capabilities to WordPress Editors dynamically, without
+     * permanently modifying the editor role in the database.
+     */
+    public static function boot(): void {
+        add_filter(
+            'user_has_cap',
+            static function ( array $allcaps, array $caps, array $args, \WP_User $user ): array {
+                if ( ! in_array( 'editor', $user->roles, true ) ) {
+                    return $allcaps;
+                }
+                foreach ( self::ROLE_CAPS['duck_race_manager'] as $cap => $granted ) {
+                    if ( $granted ) {
+                        $allcaps[ $cap ] = true;
+                    }
+                }
+                return $allcaps;
+            },
+            10,
+            4
+        );
+    }
 
     public static function register(): void {
         foreach ( self::ROLE_CAPS as $role => $caps ) {

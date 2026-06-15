@@ -117,6 +117,15 @@ class Menu {
 
         add_submenu_page(
             self::TOP_LEVEL_SLUG,
+            __( 'Refunds', 'duck-race' ),
+            __( 'Refunds', 'duck-race' ),
+            'duck_race_process_refunds',
+            'duck-race-refunds',
+            [ new RefundPage(), 'render' ]
+        );
+
+        add_submenu_page(
+            self::TOP_LEVEL_SLUG,
             __( 'Help', 'duck-race' ),
             __( 'Help', 'duck-race' ),
             'duck_race_access',

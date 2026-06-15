@@ -167,6 +167,75 @@ class PurchaseService {
         ( new EmailService() )->send_purchase_confirmation( $purchase_id );
     }
 
+    public function mark_refunded( int $purchase_id, string $refund_id, float $amount, string $reason, string $source = 'admin' ): void {
+        global $wpdb;
+        $purchase_table = Schema::table_name( 'purchases' );
+        $entries_table  = Schema::table_name( 'entries' );
+        $now            = current_time( 'mysql', true );
+
+        $wpdb->update(
+            $purchase_table,
+            [
+                'payment_status'  => 'refunded',
+                'stripe_refund_id' => sanitize_text_field( $refund_id ),
+                'refunded_amount' => number_format( $amount, 2, '.', '' ),
+                'refund_reason'   => sanitize_text_field( $reason ),
+                'refunded_at'     => $now,
+            ],
+            [ 'id' => $purchase_id ]
+        );
+
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$entries_table} SET entry_status = 'voided', updated_at = %s
+                 WHERE purchase_id = %d AND entry_status IN ('sold_online','sold_manual')",
+                $now,
+                $purchase_id
+            )
+        );
+
+        \DuckRace\Audit\Logger::log(
+            'purchase.refunded',
+            'purchase',
+            $purchase_id,
+            null,
+            [ 'refund_id' => $refund_id, 'amount' => $amount, 'reason' => $reason, 'source' => $source ]
+        );
+
+        ( new EmailService() )->send_refund_confirmation( $purchase_id, $amount );
+    }
+
+    public function get_paid_by_race( int $race_id ): array {
+        global $wpdb;
+        $purchases_table = Schema::table_name( 'purchases' );
+        $contacts_table  = Schema::table_name( 'contacts' );
+        $entries_table   = Schema::table_name( 'entries' );
+
+        return $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT p.*, c.first_name, c.last_name, c.email,
+                        GROUP_CONCAT(e.duck_number ORDER BY e.duck_number ASC SEPARATOR ', ') AS duck_numbers
+                 FROM {$purchases_table} p
+                 LEFT JOIN {$contacts_table} c ON c.id = p.contact_id
+                 LEFT JOIN {$entries_table} e ON e.purchase_id = p.id
+                 WHERE p.race_id = %d AND p.payment_status IN ('paid','refunded')
+                 GROUP BY p.id
+                 ORDER BY p.paid_at DESC",
+                $race_id
+            )
+        ) ?: [];
+    }
+
+    public function get_by_charge_id( string $charge_id ): ?object {
+        global $wpdb;
+        $table = Schema::table_name( 'purchases' );
+        $row   = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM {$table} WHERE stripe_charge_id = %s LIMIT 1", $charge_id )
+        );
+
+        return is_object( $row ) ? $row : null;
+    }
+
     public function release_reservations( int $purchase_id, string $status = 'failed' ): void {
         global $wpdb;
         $purchase_table = Schema::table_name( 'purchases' );

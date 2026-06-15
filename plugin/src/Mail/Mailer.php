@@ -17,6 +17,20 @@ class Mailer {
         $body = (string) ( $args['body'] ?? '' );
         $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
 
+        $settings   = (array) get_option( 'duck_race_settings', [] );
+        $from_email = sanitize_email( (string) ( $settings['contact_email'] ?? '' ) );
+        $from_name  = sanitize_text_field( (string) ( $settings['organisation_name'] ?? '' ) );
+
+        $from_email_filter = '' !== $from_email ? static fn() => $from_email : null;
+        $from_name_filter  = '' !== $from_email && '' !== $from_name ? static fn() => $from_name : null;
+
+        if ( $from_email_filter ) {
+            add_filter( 'wp_mail_from', $from_email_filter );
+        }
+        if ( $from_name_filter ) {
+            add_filter( 'wp_mail_from_name', $from_name_filter );
+        }
+
         $ok = false;
         $error = '';
         if ( '' !== $to && '' !== $subject && '' !== trim( wp_strip_all_tags( $body ) ) ) {
@@ -26,6 +40,13 @@ class Mailer {
             }
         } else {
             $error = 'invalid_email_payload';
+        }
+
+        if ( $from_email_filter ) {
+            remove_filter( 'wp_mail_from', $from_email_filter );
+        }
+        if ( $from_name_filter ) {
+            remove_filter( 'wp_mail_from_name', $from_name_filter );
         }
 
         $this->log_event(

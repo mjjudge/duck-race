@@ -7,6 +7,8 @@ defined( 'ABSPATH' ) || exit;
 class Plugin {
 
     public function boot(): void {
+        Roles::boot();
+
         // Self-heal: if the administrator role is missing plugin capabilities (e.g. plugin was
         // activated before a new capability was added), re-sync without requiring deactivation.
         $admin = get_role( 'administrator' );
@@ -49,6 +51,7 @@ class Plugin {
             ( new \DuckRace\Admin\ReportingPage() )->register();
             ( new \DuckRace\Admin\DuckGridPage() )->register();
             ( new \DuckRace\Admin\CampaignMarketingPage() )->register();
+            ( new \DuckRace\Admin\RefundPage() )->register();
         }
     }
 }
