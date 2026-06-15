@@ -21,7 +21,7 @@ class Menu {
             'duck_race_access',
             self::TOP_LEVEL_SLUG,
             '',
-            'dashicons-flag',
+            plugins_url( 'assets/images/duck-menu-icon.svg', DUCK_RACE_PLUGIN_FILE ),
             56
         );
 
