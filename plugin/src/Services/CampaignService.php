@@ -428,7 +428,9 @@ class CampaignService {
     }
 
     private function buy_link( string $race_slug ): string {
-        return add_query_arg( [ 'race' => $race_slug ], home_url( '/duck-race-buy/' ) );
+        $settings = get_option( 'duck_race_settings', [] );
+        $buy_slug = (string) ( $settings['buy_page_slug'] ?? 'duck-race-buy' );
+        return add_query_arg( [ 'race' => $race_slug ], home_url( '/' . $buy_slug . '/' ) );
     }
 
     private function nullable_bool( string $value ): ?bool {

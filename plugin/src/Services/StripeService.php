@@ -17,8 +17,12 @@ class StripeService {
             return $this->fallback_local_session( $purchase_id );
         }
 
-        $success_url = add_query_arg( [ 'purchase_id' => $purchase_id ], home_url( '/duck-race-success' ) );
-        $cancel_url = add_query_arg( [ 'purchase_id' => $purchase_id ], home_url( '/duck-race-failure' ) );
+        $success_slug = (string) ( $settings['success_page_slug'] ?? 'duck-race-success' );
+        $failure_slug = (string) ( $settings['failure_page_slug'] ?? 'duck-race-failure' );
+        $currency     = strtolower( (string) ( $settings['currency_code'] ?? 'gbp' ) );
+
+        $success_url = add_query_arg( [ 'purchase_id' => $purchase_id ], home_url( '/' . $success_slug ) );
+        $cancel_url  = add_query_arg( [ 'purchase_id' => $purchase_id ], home_url( '/' . $failure_slug ) );
 
         $body = [
             'mode' => 'payment',
@@ -28,7 +32,7 @@ class StripeService {
             'metadata[purchase_id]' => (string) $purchase_id,
             'payment_intent_data[description]' => $payment_ref ?: $description,
             'line_items[0][quantity]' => 1,
-            'line_items[0][price_data][currency]' => 'gbp',
+            'line_items[0][price_data][currency]' => $currency,
             'line_items[0][price_data][product_data][name]' => $description,
             'line_items[0][price_data][unit_amount]' => (string) max( 1, (int) round( $amount_gbp * 100 ) ),
         ];
@@ -88,10 +92,12 @@ class StripeService {
      * @return array{session_id:string, checkout_url:string}
      */
     private function fallback_local_session( int $purchase_id ): array {
-        $session_id = 'dr_sess_' . wp_generate_password( 24, false, false );
+        $settings     = get_option( 'duck_race_settings', [] );
+        $success_slug = (string) ( $settings['success_page_slug'] ?? 'duck-race-success' );
+        $session_id   = 'dr_sess_' . wp_generate_password( 24, false, false );
         $checkout_url = add_query_arg(
             [ 'purchase_id' => $purchase_id, 'session_id' => $session_id ],
-            home_url( '/duck-race-success' )
+            home_url( '/' . $success_slug )
         );
 
         return [

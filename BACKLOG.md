@@ -225,6 +225,32 @@ Goal: Address bugs, UX issues, and usability gaps identified during live user te
 | DR-184 | Handle charge.refunded Stripe webhook event | P1 |
 | DR-185 | Send refund confirmation email to buyer | P2 |
 
+### Phase 20 - Universal Configuration
+
+Goal: Any club anywhere can install and run the plugin without touching code.
+
+| ID | Item | Priority |
+| --- | --- | --- |
+| DR-200 | Make Stripe response page slugs configurable in Settings | P0 |
+| DR-201 | Currency code and symbol configurable in Settings | P1 |
+| DR-202 | Gift Aid toggle in Settings (default on; off for non-UK clubs) | P1 |
+| DR-203 | Configurable consent opt-in label text + privacy policy URL | P1 |
+| DR-204 | Donation quick-select amounts configurable in Settings | P2 |
+| DR-205 | Event/item terminology configurable (e.g. "Duck" → "Ticket") | P2 |
+| DR-206 | Date format locale setting | P2 |
+
+### Phase 21 - Rich Email Editor
+
+| ID | Item | Priority |
+| --- | --- | --- |
+| DR-211 | Rich email editor with placeholder picker and WordPress image insertion | P1 |
+
+### Phase 22 - Documentation
+
+| ID | Item | Priority |
+| --- | --- | --- |
+| DR-220 | Rewrite README.md as an engaging, accessible document for any club | P1 |
+
 ### Phase 19 - Duck Reassignment
 
 | ID | Item | Priority |
@@ -1147,7 +1173,7 @@ DR-180 — Add duck_race_process_refunds capability
 Description
 Add a dedicated capability for processing refunds. This is a financial action so it is restricted to the Settings Admin role and WP administrators. Duck Race Managers and auto-granted Editors do not receive this capability.
 Status
-    • [ ] Not started
+    • [x] Complete
 Acceptance Criteria
     • duck_race_process_refunds is added to ALL_CAPS.
     • duck_race_settings_admin role receives the capability (true).
@@ -1161,7 +1187,7 @@ DR-181 — Add refund columns to purchases table
 Description
 The purchases table needs four new columns to record refund details: stripe_refund_id, refunded_at, refunded_amount, and refund_reason. A versioned migration adds them using dbDelta.
 Status
-    • [ ] Not started
+    • [x] Complete
 Acceptance Criteria
     • Migration class AddRefundColumnsToPurchases uses dbDelta on the full CREATE TABLE definition.
     • Adds: stripe_refund_id VARCHAR(191) NULL, refunded_at DATETIME NULL, refunded_amount DECIMAL(10,2) NULL, refund_reason VARCHAR(255) NULL.
@@ -1175,7 +1201,7 @@ DR-182 — Build RefundService
 Description
 A dedicated service that handles the refund logic for both online (Stripe) and manual purchases.
 Status
-    • [ ] Not started
+    • [x] Complete
 Acceptance Criteria
     • process(int $purchase_id, string $reason): array{ok:bool, error?:string} method.
     • Validates purchase exists and has payment_status = 'paid'.
@@ -1190,7 +1216,7 @@ DR-183 — Add admin Refunds page and process refund action
 Description
 A dedicated Refunds submenu page gated by duck_race_process_refunds. Admin can select a race, see paid purchases, and issue refunds with a reason. Also shows already-refunded purchases for the race.
 Status
-    • [ ] Not started
+    • [x] Complete
 Acceptance Criteria
     • Page is registered as a hidden submenu (no nav entry unless user has capability).
     • Shows race selector at the top.
@@ -1208,7 +1234,7 @@ DR-184 — Handle charge.refunded Stripe webhook event
 Description
 When a refund is issued from the Stripe dashboard rather than via the plugin, Stripe sends a charge.refunded event. The webhook processor must handle this idempotently.
 Status
-    • [ ] Not started
+    • [x] Complete
 Acceptance Criteria
     • StripeWebhookProcessor handles charge.refunded event type.
     • Finds purchase by stripe_charge_id stored on the purchase record.
@@ -1217,6 +1243,146 @@ Acceptance Criteria
     • Returns 200 for unknown purchases (Stripe may send events for non-plugin charges).
 Dependencies
 DR-182, DR-072.
+
+EPIC 20 — Universal Configuration
+
+DR-200 — Make Stripe response page slugs configurable in Settings
+Description
+The success, failure, and buy page slugs are hardcoded as duck-race-success, duck-race-failure, and duck-race-buy throughout StripeService, CheckoutController, and CampaignService. Any site with conflicting slugs, or any admin who wants custom URLs, is currently blocked. Settings Admin must be able to set these without touching code.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings page adds three URL/slug fields: Payment Success Page, Payment Failure Page, Buy Page.
+    • Fields show the current page URL (derived from slug) as a helper, with a link to edit the page.
+    • StripeService reads success_url and cancel_url from settings, falling back to the defaults.
+    • CheckoutController and CampaignService read the buy page slug from settings.
+    • Existing installs that already have the default pages are unaffected.
+    • Installer still creates default pages on fresh install but records their IDs/slugs in settings.
+Dependencies
+DR-070, DR-073.
+
+DR-201 — Currency code and symbol configurable in Settings
+Description
+GBP and £ are hardcoded throughout the plugin — in the Stripe API call, the purchases table default, price display, donation buttons, and email formatting. Non-UK clubs cannot use the plugin without code changes.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings Admin can set currency code (e.g. GBP, USD, EUR) and currency symbol (e.g. £, $, €).
+    • Default: GBP / £ (preserves existing behaviour).
+    • Stripe checkout uses the configured currency code.
+    • All price display throughout admin and public uses the configured symbol.
+    • Currency symbol is available as a {currency_symbol} merge tag in email templates.
+    • The database currency column default does not need to change (existing records are valid).
+Dependencies
+DR-070, DR-082.
+
+DR-202 — Gift Aid toggle in Settings
+Description
+The Gift Aid checkbox and HMRC declaration text on the buy form are UK-specific and hardcoded. Non-UK clubs see irrelevant and potentially misleading legal text. Gift Aid should be a toggle in Settings.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings Admin can enable or disable Gift Aid collection (default: enabled).
+    • When disabled: Gift Aid fieldset is completely hidden from the public buy form.
+    • When disabled: gift_aid_declared is never set to 1 on new purchases.
+    • Existing records with gift_aid_declared = 1 are unaffected — GDPR retention logic continues to apply to them.
+    • Anonymisation logic still checks for historical Gift Aid declarations regardless of the toggle.
+Dependencies
+DR-063, DR-101.
+
+DR-203 — Configurable consent opt-in label text and privacy policy URL
+Description
+The two marketing consent opt-in labels are hardcoded in BuyFormHandler: "Contact me about future duck races" and "Contact me about other [org] activities". Each club needs its own wording based on their legal advice. A privacy policy URL is also missing from the buy form, which is a GDPR best practice gap.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings Admin can set label text for consent opt-in 1 (duck-race communications).
+    • Settings Admin can set label text for consent opt-in 2 (wider organisation communications).
+    • Settings Admin can set a privacy policy URL.
+    • Privacy policy URL, if set, appears as a link near the consent checkboxes on the buy form.
+    • Defaults preserve current wording so existing installs are unaffected.
+Dependencies
+DR-063, DR-082.
+
+DR-204 — Donation quick-select amounts configurable in Settings
+Description
+The donation quick-select buttons on the buy form are hardcoded at £5, £10, and £15. Clubs with different expectations (higher-value events, different currencies) need to set their own amounts.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings Admin can configure up to three quick-donate amounts.
+    • Defaults: 5, 10, 15 (in whatever the configured currency is).
+    • If all three are left blank/zero, no quick-select buttons are shown.
+    • Currency symbol is shown alongside each amount field in settings.
+Dependencies
+DR-201, DR-063.
+
+DR-205 — Event and item terminology configurable in Settings
+Description
+The words "Duck" and "Duck Race" are used in all public-facing text. A football club running a "penalty shootout raffle", a school running a "tombola", or a golf club running a "ball drop" cannot brand the plugin appropriately without code changes.
+Status
+    • [ ] Not started
+Acceptance Criteria
+    • Settings Admin can set a singular item name (default: "Duck") and an event name (default: "Duck Race").
+    • Public buy form, confirmation emails, and winners shortcode output use the configured terms.
+    • Admin navigation and internal labels are not changed (they always say "Duck Race").
+    • Merge tags {item_name} and {event_name} are available in email templates.
+    • Defaults preserve current wording.
+Dependencies
+DR-060, DR-082.
+
+DR-206 — Date format locale setting
+Description
+Dates are displayed in dd/mm/yyyy format throughout the plugin, hardcoded for UK use. Clubs in other countries expect their own locale format (mm/dd/yyyy, yyyy-mm-dd, etc.).
+Status
+    • [ ] Not started
+Acceptance Criteria
+    • Settings Admin can select from a list of common date format patterns.
+    • Default: dd/mm/yyyy.
+    • Format applied consistently across admin and public-facing date display.
+    • Underlying database storage (ISO format) is unaffected.
+Dependencies
+DR-163.
+
+EPIC 21 — Rich Email Editor
+
+DR-211 — Rich email editor with placeholder picker and WordPress image insertion
+Description
+The current email template editing experience is a plain textarea requiring hand-written HTML. Admins need a proper visual editor: a modal that opens from each template's Edit button, containing a TinyMCE rich-text editor (matching the WordPress post editor experience), a placeholder/merge-tag insert dropdown, and WordPress media library integration for inserting images.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Each email template on the Settings page has an "Edit email" button that opens a modal lightbox.
+    • The modal contains: a subject line plain-text field, and a body editor using WordPress's wp_editor() (TinyMCE).
+    • TinyMCE toolbar includes standard formatting (bold, italic, headings, bullet lists, links) plus a custom "Insert placeholder" dropdown button.
+    • "Insert placeholder" lists all available merge tags (e.g. {first_name}, {race_title}, {duck_numbers}, {purchase_total}) and inserts the selected tag at the cursor position in the editor.
+    • The TinyMCE "Insert/edit image" button opens the WordPress media library so admins can pick or upload an image.
+    • The modal also offers a "Switch to HTML" toggle that shows a raw text area with the current HTML source, for admins who prefer to write HTML directly.
+    • Saving the modal writes back to the same settings fields as the current textarea approach — no schema change required.
+    • The modal is accessible: focus is trapped within it, Escape closes it, and ARIA roles are applied.
+    • Each template (purchase confirmation, race reminder, refund confirmation, supporter invitation, abandoned checkout, winner marketing) gets its own Edit button.
+    • Subject line editing remains a plain-text input (no rich text needed for subjects).
+Dependencies
+DR-082, DR-205.
+
+EPIC 22 — Documentation
+
+DR-220 — Rewrite README.md as an engaging, accessible document
+Description
+The current README.md is a technical scaffold document aimed at developers. It does not explain what the plugin does, who it is for, or how to get started. Any club wanting to evaluate or adopt the plugin needs an accessible, well-structured front page.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Opens with a clear, plain-language description of what the plugin does and who it is for.
+    • Includes a "Key features" section covering: race management, online sales, manual sales, Stripe integration, winner recording, GDPR/retention, reporting.
+    • Includes a "Who can use this?" section making clear the plugin is organisation-neutral.
+    • Includes a "Quick start" section: install → activate → configure settings → create race → add shortcode.
+    • Includes a "Screenshots" placeholder section.
+    • Technical contribution notes (architecture, development setup) are retained but moved to a collapsible or clearly marked section.
+    • Removes all out-of-date scaffold/planning content.
+    • Tone is welcoming to non-technical club treasurers and administrators.
+Dependencies
+DR-154, DR-175.
 
 EPIC 19 — Duck Reassignment
 

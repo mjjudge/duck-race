@@ -50,6 +50,34 @@ class SettingsPage {
         $retention_last_run_at = (string) get_option( 'duck_race_retention_last_run_at', '' );
         $retention_last_run_count = (int) get_option( 'duck_race_retention_last_run_count', 0 );
 
+        // DR-200: Configurable page slugs.
+        $success_page_slug = (string) ( $settings['success_page_slug'] ?? 'duck-race-success' );
+        $failure_page_slug = (string) ( $settings['failure_page_slug'] ?? 'duck-race-failure' );
+        $buy_page_slug     = (string) ( $settings['buy_page_slug'] ?? 'duck-race-buy' );
+
+        // DR-201: Currency.
+        $currency_code   = strtoupper( (string) ( $settings['currency_code'] ?? 'GBP' ) );
+        $currency_symbol = (string) ( $settings['currency_symbol'] ?? '£' );
+
+        // DR-202: Gift Aid toggle (on by default; stored as 1/0 after first save).
+        $enable_gift_aid = ! array_key_exists( 'enable_gift_aid', $settings ) || ! empty( $settings['enable_gift_aid'] );
+
+        // DR-203: Consent labels and privacy URL.
+        $consent_label_duck_race    = (string) ( $settings['consent_label_duck_race'] ?? '' );
+        $consent_label_organisation = (string) ( $settings['consent_label_organisation'] ?? '' );
+        $privacy_policy_url         = (string) ( $settings['privacy_policy_url'] ?? '' );
+
+        // DR-204: Donation quick-pick amounts.
+        $donation_amount_1 = (string) ( $settings['donation_amount_1'] ?? '5' );
+        $donation_amount_2 = (string) ( $settings['donation_amount_2'] ?? '10' );
+        $donation_amount_3 = (string) ( $settings['donation_amount_3'] ?? '15' );
+
+        // DR-211: Additional email templates.
+        $refund_subject = (string) ( $settings['email_refund_confirmation_subject'] ?? '' );
+        $refund_body    = (string) ( $settings['email_refund_confirmation_body'] ?? '' );
+
+        wp_enqueue_media();
+
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__( 'Duck Race Settings', 'duck-race' ) . '</h1>';
 
@@ -91,9 +119,55 @@ class SettingsPage {
         echo '</tr>';
 
         echo '<tr>';
-        echo '<th scope="row"><label for="default_duck_price">' . esc_html__( 'Default duck price (£)', 'duck-race' ) . '</label></th>';
+        echo '<th scope="row"><label for="default_duck_price">' . esc_html__( 'Default duck price', 'duck-race' ) . '</label></th>';
         echo '<td><input name="default_duck_price" id="default_duck_price" type="number" min="0" step="0.01" class="small-text" value="' . esc_attr( $default_duck_price ) . '" />';
         echo '<p class="description">' . esc_html__( 'Pre-filled price per duck when creating a new race. Each race can still be adjusted individually on the Race edit page.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="currency_code">' . esc_html__( 'Currency code', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="currency_code" id="currency_code" type="text" class="small-text" maxlength="3" value="' . esc_attr( $currency_code ) . '" />';
+        echo '<p class="description">' . esc_html__( 'ISO 4217 code sent to Stripe (e.g. GBP, USD, EUR). Must match your Stripe account currency.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="currency_symbol">' . esc_html__( 'Currency symbol', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="currency_symbol" id="currency_symbol" type="text" class="small-text" maxlength="4" value="' . esc_attr( $currency_symbol ) . '" />';
+        echo '<p class="description">' . esc_html__( 'Symbol displayed on the buy form and in emails (e.g. £, $, €).', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="enable_gift_aid">' . esc_html__( 'Gift Aid', 'duck-race' ) . '</label></th>';
+        echo '<td><label><input name="enable_gift_aid" id="enable_gift_aid" type="checkbox" value="1" ' . checked( $enable_gift_aid, true, false ) . ' /> ' . esc_html__( 'Show Gift Aid declaration on the buy form', 'duck-race' ) . '</label>';
+        echo '<p class="description">' . esc_html__( 'UK-specific. Untick if your organisation does not operate Gift Aid or is not UK-based.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row">' . esc_html__( 'Donation quick-pick amounts', 'duck-race' ) . '</th>';
+        echo '<td>';
+        echo '<input name="donation_amount_1" type="number" min="0" step="1" class="small-text" value="' . esc_attr( $donation_amount_1 ) . '" aria-label="' . esc_attr__( 'First amount', 'duck-race' ) . '" />';
+        echo '&nbsp;<input name="donation_amount_2" type="number" min="0" step="1" class="small-text" value="' . esc_attr( $donation_amount_2 ) . '" aria-label="' . esc_attr__( 'Second amount', 'duck-race' ) . '" />';
+        echo '&nbsp;<input name="donation_amount_3" type="number" min="0" step="1" class="small-text" value="' . esc_attr( $donation_amount_3 ) . '" aria-label="' . esc_attr__( 'Third amount', 'duck-race' ) . '" />';
+        echo '<p class="description">' . esc_html__( 'Three quick-pick donation button values on the buy form. Set a value to 0 to hide that button.', 'duck-race' ) . '</p>';
+        echo '</td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="consent_label_duck_race">' . esc_html__( 'Consent label — duck races', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="consent_label_duck_race" id="consent_label_duck_race" type="text" class="large-text" value="' . esc_attr( $consent_label_duck_race ) . '" placeholder="' . esc_attr__( 'Contact me about future duck races', 'duck-race' ) . '" />';
+        echo '<p class="description">' . esc_html__( 'Label for the first consent checkbox on the buy form. Leave blank for the default text.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="consent_label_organisation">' . esc_html__( 'Consent label — organisation', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="consent_label_organisation" id="consent_label_organisation" type="text" class="large-text" value="' . esc_attr( $consent_label_organisation ) . '" placeholder="' . esc_attr__( 'Contact me about other {organisation_name} activities', 'duck-race' ) . '" />';
+        echo '<p class="description">' . esc_html__( 'Label for the second consent checkbox. Use {organisation_name} to include your organisation name. Leave blank for the default.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="privacy_policy_url">' . esc_html__( 'Privacy policy URL', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="privacy_policy_url" id="privacy_policy_url" type="url" class="regular-text" value="' . esc_attr( $privacy_policy_url ) . '" />';
+        echo '<p class="description">' . esc_html__( 'URL to your privacy policy page. When set, a link appears under the consent checkboxes on the buy form.', 'duck-race' ) . '</p></td>';
         echo '</tr>';
 
         echo '<tr>';
@@ -122,6 +196,35 @@ class SettingsPage {
         echo '</tr>';
 
         echo '<tr>';
+        echo '<th scope="row"><label for="success_page_slug">' . esc_html__( 'Payment success page slug', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="success_page_slug" id="success_page_slug" type="text" class="regular-text" value="' . esc_attr( $success_page_slug ) . '" />';
+        echo '<p class="description">' . sprintf(
+            esc_html__( 'WordPress page slug Stripe redirects to after successful payment. Default: %1$s. Current URL: %2$s', 'duck-race' ),
+            '<code>duck-race-success</code>',
+            '<code>' . esc_html( home_url( '/' . $success_page_slug ) ) . '</code>'
+        ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="failure_page_slug">' . esc_html__( 'Payment failure/cancel page slug', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="failure_page_slug" id="failure_page_slug" type="text" class="regular-text" value="' . esc_attr( $failure_page_slug ) . '" />';
+        echo '<p class="description">' . sprintf(
+            esc_html__( 'WordPress page slug Stripe redirects to when payment is cancelled or fails. Default: %1$s. Current URL: %2$s', 'duck-race' ),
+            '<code>duck-race-failure</code>',
+            '<code>' . esc_html( home_url( '/' . $failure_page_slug ) ) . '</code>'
+        ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="buy_page_slug">' . esc_html__( 'Buy page slug', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="buy_page_slug" id="buy_page_slug" type="text" class="regular-text" value="' . esc_attr( $buy_page_slug ) . '" />';
+        echo '<p class="description">' . sprintf(
+            esc_html__( 'WordPress page slug that hosts the duck purchase form. Default: %s. Used to construct links in campaign emails.', 'duck-race' ),
+            '<code>duck-race-buy</code>'
+        ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
         echo '<th scope="row"><label for="email_logo_url">' . esc_html__( 'Email logo URL', 'duck-race' ) . '</label></th>';
         echo '<td><input name="email_logo_url" id="email_logo_url" type="url" class="regular-text" value="' . esc_attr( $email_logo_url ) . '" />';
         echo '<p class="description">' . esc_html__( 'Full URL of an image to display at the top of outgoing emails. Leave blank to send text-only emails without a logo.', 'duck-race' ) . '</p></td>';
@@ -130,25 +233,46 @@ class SettingsPage {
         echo '<tr>';
         echo '<th scope="row"><label for="email_purchase_confirmation_subject">' . esc_html__( 'Purchase confirmation subject', 'duck-race' ) . '</label></th>';
         echo '<td><input name="email_purchase_confirmation_subject" id="email_purchase_confirmation_subject" type="text" class="regular-text" value="' . esc_attr( $purchase_subject ) . '" />';
-        echo '<p class="description">' . esc_html__( 'Subject line of the email sent to the buyer after a successful payment. Merge tags are supported.', 'duck-race' ) . '</p></td>';
+        echo '<p class="description">' . esc_html__( 'Subject line sent to the buyer after successful payment. Merge tags supported.', 'duck-race' ) . '</p></td>';
         echo '</tr>';
 
         echo '<tr>';
-        echo '<th scope="row"><label for="email_purchase_confirmation_body">' . esc_html__( 'Purchase confirmation body (HTML)', 'duck-race' ) . '</label></th>';
-        echo '<td><textarea name="email_purchase_confirmation_body" id="email_purchase_confirmation_body" rows="8" class="large-text code">' . esc_textarea( $purchase_body ) . '</textarea>';
-        echo '<p class="description">' . esc_html__( 'HTML body of the purchase confirmation email. Use the merge tags listed below.', 'duck-race' ) . '</p></td>';
+        echo '<th scope="row"><label>' . esc_html__( 'Purchase confirmation body', 'duck-race' ) . '</label></th>';
+        echo '<td>';
+        $this->render_placeholder_picker( 'email_purchase_confirmation_body' );
+        wp_editor( $purchase_body, 'email_purchase_confirmation_body', $this->editor_settings( 'email_purchase_confirmation_body' ) );
+        echo '<p class="description">' . esc_html__( 'HTML body of the purchase confirmation email. Use the placeholder picker above to insert merge tags.', 'duck-race' ) . '</p>';
+        echo '</td>';
         echo '</tr>';
 
         echo '<tr>';
         echo '<th scope="row"><label for="email_race_reminder_subject">' . esc_html__( 'Race reminder subject', 'duck-race' ) . '</label></th>';
         echo '<td><input name="email_race_reminder_subject" id="email_race_reminder_subject" type="text" class="regular-text" value="' . esc_attr( $reminder_subject ) . '" />';
-        echo '<p class="description">' . esc_html__( 'Subject line of the operational reminder email sent to race participants. Merge tags are supported.', 'duck-race' ) . '</p></td>';
+        echo '<p class="description">' . esc_html__( 'Subject line of the operational reminder email sent to race participants. Merge tags supported.', 'duck-race' ) . '</p></td>';
         echo '</tr>';
 
         echo '<tr>';
-        echo '<th scope="row"><label for="email_race_reminder_body">' . esc_html__( 'Race reminder body (HTML)', 'duck-race' ) . '</label></th>';
-        echo '<td><textarea name="email_race_reminder_body" id="email_race_reminder_body" rows="8" class="large-text code">' . esc_textarea( $reminder_body ) . '</textarea>';
-        echo '<p class="description">' . esc_html__( 'HTML body of the race reminder email. Use the merge tags listed below.', 'duck-race' ) . '</p></td>';
+        echo '<th scope="row"><label>' . esc_html__( 'Race reminder body', 'duck-race' ) . '</label></th>';
+        echo '<td>';
+        $this->render_placeholder_picker( 'email_race_reminder_body' );
+        wp_editor( $reminder_body, 'email_race_reminder_body', $this->editor_settings( 'email_race_reminder_body' ) );
+        echo '<p class="description">' . esc_html__( 'HTML body of the race reminder email.', 'duck-race' ) . '</p>';
+        echo '</td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label for="email_refund_confirmation_subject">' . esc_html__( 'Refund confirmation subject', 'duck-race' ) . '</label></th>';
+        echo '<td><input name="email_refund_confirmation_subject" id="email_refund_confirmation_subject" type="text" class="regular-text" value="' . esc_attr( $refund_subject ) . '" placeholder="' . esc_attr__( 'Your Duck Race refund for {race_title}', 'duck-race' ) . '" />';
+        echo '<p class="description">' . esc_html__( 'Subject line of the refund confirmation email. Merge tags supported. Leave blank for the default.', 'duck-race' ) . '</p></td>';
+        echo '</tr>';
+
+        echo '<tr>';
+        echo '<th scope="row"><label>' . esc_html__( 'Refund confirmation body', 'duck-race' ) . '</label></th>';
+        echo '<td>';
+        $this->render_placeholder_picker( 'email_refund_confirmation_body' );
+        wp_editor( $refund_body, 'email_refund_confirmation_body', $this->editor_settings( 'email_refund_confirmation_body' ) );
+        echo '<p class="description">' . esc_html__( 'HTML body of the refund confirmation email. Use {refund_amount} to include the refunded amount.', 'duck-race' ) . '</p>';
+        echo '</td>';
         echo '</tr>';
 
         echo '<tr>';
@@ -250,9 +374,9 @@ class SettingsPage {
         }
 
         $required_pages = [
-            [ 'slug' => 'duck-race-buy',     'label' => 'Buy Ducks',       'shortcode' => '[duck_race_buy race="current"]' ],
-            [ 'slug' => 'duck-race-success',  'label' => 'Payment Success', 'shortcode' => '[duck_race_payment_success]' ],
-            [ 'slug' => 'duck-race-failure',  'label' => 'Payment Failure', 'shortcode' => '[duck_race_payment_failure]' ],
+            [ 'slug' => $buy_page_slug,     'label' => 'Buy Ducks',       'shortcode' => '[duck_race_buy race="current"]' ],
+            [ 'slug' => $success_page_slug, 'label' => 'Payment Success', 'shortcode' => '[duck_race_payment_success]' ],
+            [ 'slug' => $failure_page_slug, 'label' => 'Payment Failure', 'shortcode' => '[duck_race_payment_failure]' ],
         ];
 
         echo '<table class="widefat striped" style="max-width:700px;">';
@@ -340,6 +464,27 @@ class SettingsPage {
             '<a href="' . esc_url( admin_url( 'admin.php?page=duck-race-help' ) ) . '">' . esc_html__( 'Help', 'duck-race' ) . '</a>'
         ) . '</p>';
         echo '</div>';
+
+        ?>
+        <script>
+        function drInsertPlaceholder(editorId, selectEl) {
+            var val = selectEl ? selectEl.value : '';
+            if (!val) return;
+            if (typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
+                tinymce.get(editorId).execCommand('mceInsertContent', false, val);
+            } else {
+                var ta = document.getElementById(editorId);
+                if (ta) {
+                    var s = ta.selectionStart, e = ta.selectionEnd;
+                    ta.value = ta.value.substring(0, s) + val + ta.value.substring(e);
+                    ta.selectionStart = ta.selectionEnd = s + val.length;
+                    ta.focus();
+                }
+            }
+            if (selectEl) selectEl.value = '';
+        }
+        </script>
+        <?php
     }
 
     public function handle_save(): void {
@@ -358,9 +503,38 @@ class SettingsPage {
         $purchase_body = wp_kses_post( wp_unslash( $_POST['email_purchase_confirmation_body'] ?? '' ) );
         $reminder_subject = sanitize_text_field( wp_unslash( $_POST['email_race_reminder_subject'] ?? '' ) );
         $reminder_body = wp_kses_post( wp_unslash( $_POST['email_race_reminder_body'] ?? '' ) );
+        $refund_subject = sanitize_text_field( wp_unslash( $_POST['email_refund_confirmation_subject'] ?? '' ) );
+        $refund_body    = wp_kses_post( wp_unslash( $_POST['email_refund_confirmation_body'] ?? '' ) );
         $default_duck_price = number_format( max( 0.0, (float) ( $_POST['default_duck_price'] ?? 2.50 ) ), 2, '.', '' );
         $retention_days = max( 30, min( 3650, (int) ( $_POST['retention_non_opt_in_days'] ?? (int) ( $existing['retention_non_opt_in_days'] ?? 365 ) ) ) );
         $confirm_uninstall_data_removal = isset( $_POST['confirm_uninstall_data_removal'] ) ? 1 : 0;
+
+        // DR-200: Page slugs.
+        $success_page_slug = sanitize_title( wp_unslash( (string) ( $_POST['success_page_slug'] ?? '' ) ) );
+        if ( '' === $success_page_slug ) { $success_page_slug = 'duck-race-success'; }
+        $failure_page_slug = sanitize_title( wp_unslash( (string) ( $_POST['failure_page_slug'] ?? '' ) ) );
+        if ( '' === $failure_page_slug ) { $failure_page_slug = 'duck-race-failure'; }
+        $buy_page_slug = sanitize_title( wp_unslash( (string) ( $_POST['buy_page_slug'] ?? '' ) ) );
+        if ( '' === $buy_page_slug ) { $buy_page_slug = 'duck-race-buy'; }
+
+        // DR-201: Currency.
+        $currency_code   = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_POST['currency_code'] ?? 'GBP' ) ) ) );
+        $currency_code   = ( '' === $currency_code || strlen( $currency_code ) > 3 ) ? 'GBP' : $currency_code;
+        $currency_symbol = sanitize_text_field( wp_unslash( (string) ( $_POST['currency_symbol'] ?? '£' ) ) );
+        if ( '' === $currency_symbol ) { $currency_symbol = '£'; }
+
+        // DR-202: Gift Aid.
+        $enable_gift_aid = isset( $_POST['enable_gift_aid'] ) ? 1 : 0;
+
+        // DR-203: Consent labels and privacy URL.
+        $consent_label_duck_race    = sanitize_text_field( wp_unslash( (string) ( $_POST['consent_label_duck_race'] ?? '' ) ) );
+        $consent_label_organisation = sanitize_text_field( wp_unslash( (string) ( $_POST['consent_label_organisation'] ?? '' ) ) );
+        $privacy_policy_url         = esc_url_raw( wp_unslash( (string) ( $_POST['privacy_policy_url'] ?? '' ) ) );
+
+        // DR-204: Donation amounts.
+        $donation_amount_1 = (string) max( 0, (int) ( $_POST['donation_amount_1'] ?? 5 ) );
+        $donation_amount_2 = (string) max( 0, (int) ( $_POST['donation_amount_2'] ?? 10 ) );
+        $donation_amount_3 = (string) max( 0, (int) ( $_POST['donation_amount_3'] ?? 15 ) );
 
         $tile_color_defaults = $this->load_tile_colors( $existing );
         $tile_colors_saved = [];
@@ -389,11 +563,31 @@ class SettingsPage {
                 'stripe_publishable_key' => $publishable_key,
                 'stripe_secret_key' => $secret_key,
                 'stripe_webhook_secret' => $webhook_secret,
+                // DR-200.
+                'success_page_slug' => $success_page_slug,
+                'failure_page_slug' => $failure_page_slug,
+                'buy_page_slug'     => $buy_page_slug,
+                // DR-201.
+                'currency_code'   => $currency_code,
+                'currency_symbol' => $currency_symbol,
+                // DR-202.
+                'enable_gift_aid' => $enable_gift_aid,
+                // DR-203.
+                'consent_label_duck_race'    => $consent_label_duck_race,
+                'consent_label_organisation' => $consent_label_organisation,
+                'privacy_policy_url'         => $privacy_policy_url,
+                // DR-204.
+                'donation_amount_1' => $donation_amount_1,
+                'donation_amount_2' => $donation_amount_2,
+                'donation_amount_3' => $donation_amount_3,
                 'email_logo_url' => $email_logo_url,
                 'email_purchase_confirmation_subject' => $purchase_subject,
                 'email_purchase_confirmation_body' => $purchase_body,
                 'email_race_reminder_subject' => $reminder_subject,
                 'email_race_reminder_body' => $reminder_body,
+                // DR-211.
+                'email_refund_confirmation_subject' => $refund_subject,
+                'email_refund_confirmation_body'    => $refund_body,
                 'email_test_recipient' => sanitize_email( wp_unslash( $_POST['email_test_recipient'] ?? (string) ( $existing['email_test_recipient'] ?? '' ) ) ),
                 'default_duck_price' => $default_duck_price,
                 'retention_non_opt_in_days' => $retention_days,
@@ -524,6 +718,57 @@ class SettingsPage {
 
         wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-settings' ], admin_url( 'admin.php' ) ) );
         exit;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function editor_settings( string $textarea_name ): array {
+        return [
+            'textarea_name' => $textarea_name,
+            'media_buttons' => true,
+            'teeny'         => false,
+            'quicktags'     => true,
+            'editor_height' => 220,
+            'tinymce'       => [
+                'toolbar1' => 'formatselect,bold,italic,underline,link,unlink,image,hr,alignleft,aligncenter,alignright,bullist,numlist,undo,redo,code',
+                'toolbar2' => '',
+            ],
+        ];
+    }
+
+    private function render_placeholder_picker( string $editor_id ): void {
+        $placeholders = [
+            '{first_name}'           => __( 'First name', 'duck-race' ),
+            '{last_name}'            => __( 'Last name', 'duck-race' ),
+            '{organisation_name}'    => __( 'Organisation name', 'duck-race' ),
+            '{race_title}'           => __( 'Race title', 'duck-race' ),
+            '{race_date}'            => __( 'Race date', 'duck-race' ),
+            '{race_time}'            => __( 'Race time', 'duck-race' ),
+            '{race_location}'        => __( 'Race location', 'duck-race' ),
+            '{duck_numbers}'         => __( 'Duck numbers', 'duck-race' ),
+            '{duck_names}'           => __( 'Duck names', 'duck-race' ),
+            '{purchase_total}'       => __( 'Purchase total', 'duck-race' ),
+            '{buy_link}'             => __( 'Buy link', 'duck-race' ),
+            '{refund_amount}'        => __( 'Refund amount', 'duck-race' ),
+            '{previous_race_result}' => __( 'Previous race result', 'duck-race' ),
+            '{winner_position}'      => __( 'Winner position', 'duck-race' ),
+        ];
+
+        $select_id  = 'dr_ph_' . esc_attr( $editor_id );
+        $escaped_id = esc_js( $editor_id );
+
+        echo '<p style="margin-bottom:6px;">';
+        echo '<select id="' . $select_id . '" style="max-width:240px;">';
+        echo '<option value="">' . esc_html__( '— Insert placeholder —', 'duck-race' ) . '</option>';
+        foreach ( $placeholders as $tag => $label ) {
+            echo '<option value="' . esc_attr( $tag ) . '">' . esc_html( $label . ' (' . $tag . ')' ) . '</option>';
+        }
+        echo '</select>';
+        echo '&nbsp;<button type="button" class="button" onclick="drInsertPlaceholder(\'' . $escaped_id . '\',document.getElementById(\'' . $select_id . '\'))">';
+        echo esc_html__( 'Insert', 'duck-race' );
+        echo '</button>';
+        echo '</p>';
     }
 
     private function masked_placeholder( string $secret ): string {

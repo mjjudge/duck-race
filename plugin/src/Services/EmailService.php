@@ -50,7 +50,9 @@ class EmailService {
             return false;
         }
 
-        $context['refund_amount'] = '£' . number_format( $refund_amount, 2 );
+        $duck_settings            = get_option( 'duck_race_settings', [] );
+        $currency_symbol          = (string) ( $duck_settings['currency_symbol'] ?? '£' );
+        $context['refund_amount'] = $currency_symbol . number_format( $refund_amount, 2 );
 
         $renderer = new TemplateRenderer();
         $subject  = $renderer->render_subject( 'refund_confirmation', $context );

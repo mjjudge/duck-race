@@ -32,6 +32,22 @@ class BuyFormHandler {
         $org_name  = (string) ( $settings['organisation_name'] ?? '' );
         $price_raw = (float) $race->price_per_duck;
         $price     = number_format( $price_raw, 2 );
+
+        // DR-201: Currency symbol.
+        $currency_symbol = (string) ( $settings['currency_symbol'] ?? '£' );
+
+        // DR-202: Gift Aid.
+        $show_gift_aid = ! array_key_exists( 'enable_gift_aid', $settings ) || ! empty( $settings['enable_gift_aid'] );
+
+        // DR-203: Consent labels and privacy URL.
+        $consent_label_1  = (string) ( $settings['consent_label_duck_race'] ?? '' );
+        $consent_label_2  = (string) ( $settings['consent_label_organisation'] ?? '' );
+        $privacy_url      = (string) ( $settings['privacy_policy_url'] ?? '' );
+
+        // DR-204: Donation amounts (skip button if value is 0).
+        $don_amt_1 = max( 0, (int) ( $settings['donation_amount_1'] ?? 5 ) );
+        $don_amt_2 = max( 0, (int) ( $settings['donation_amount_2'] ?? 10 ) );
+        $don_amt_3 = max( 0, (int) ( $settings['donation_amount_3'] ?? 15 ) );
         $max_ducks = max( 1, (int) $race->max_ducks_per_transaction );
 
         // Pre-fetch available numbers so duck rows are server-rendered (no JS async needed).
@@ -168,7 +184,7 @@ class BuyFormHandler {
                     value="1"
                     required
                 />
-                <p class="drb-hint"><?php printf( esc_html__( '£%s per duck — maximum %d per order', 'duck-race' ), esc_html( $price ), $effective_max ); ?></p>
+                <p class="drb-hint"><?php printf( esc_html__( '%1$s%2$s per duck — maximum %3$d per order', 'duck-race' ), esc_html( $currency_symbol ), esc_html( $price ), $effective_max ); ?></p>
                 <?php else : ?>
                 <p class="drb-no-ducks"><?php esc_html_e( 'Sorry, no ducks are currently available for online purchase.', 'duck-race' ); ?></p>
                 <?php endif; ?>
@@ -213,9 +229,15 @@ class BuyFormHandler {
             <div class="drb-row">
                 <span class="drb-label"><?php esc_html_e( 'Add a voluntary donation (optional)', 'duck-race' ); ?></span>
                 <div class="drb-donation-buttons" role="group" aria-label="<?php esc_attr_e( 'Donation amount', 'duck-race' ); ?>">
-                    <button type="button" class="drb-donation-btn" data-amount="5">£5</button>
-                    <button type="button" class="drb-donation-btn" data-amount="10">£10</button>
-                    <button type="button" class="drb-donation-btn" data-amount="15">£15</button>
+                    <?php if ( $don_amt_1 > 0 ) : ?>
+                    <button type="button" class="drb-donation-btn" data-amount="<?php echo esc_attr( (string) $don_amt_1 ); ?>"><?php echo esc_html( $currency_symbol . $don_amt_1 ); ?></button>
+                    <?php endif; ?>
+                    <?php if ( $don_amt_2 > 0 ) : ?>
+                    <button type="button" class="drb-donation-btn" data-amount="<?php echo esc_attr( (string) $don_amt_2 ); ?>"><?php echo esc_html( $currency_symbol . $don_amt_2 ); ?></button>
+                    <?php endif; ?>
+                    <?php if ( $don_amt_3 > 0 ) : ?>
+                    <button type="button" class="drb-donation-btn" data-amount="<?php echo esc_attr( (string) $don_amt_3 ); ?>"><?php echo esc_html( $currency_symbol . $don_amt_3 ); ?></button>
+                    <?php endif; ?>
                     <button type="button" class="drb-donation-btn" data-amount="other"><?php esc_html_e( 'Other', 'duck-race' ); ?></button>
                 </div>
                 <input
@@ -224,7 +246,7 @@ class BuyFormHandler {
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder="£0.00"
+                    placeholder="<?php echo esc_attr( $currency_symbol . '0.00' ); ?>"
                     autocomplete="off"
                     style="display:none;margin-top:8px;"
                     aria-label="<?php esc_attr_e( 'Custom donation amount', 'duck-race' ); ?>"
@@ -235,7 +257,7 @@ class BuyFormHandler {
             <?php /* ── Total ────────────────────────────────────── */ ?>
             <div class="drb-row drb-total-row">
                 <span><?php esc_html_e( 'Total cost', 'duck-race' ); ?></span>
-                <span id="drb-total" class="drb-total-amount">£<?php echo esc_html( $price ); ?></span>
+                <span id="drb-total" class="drb-total-amount"><?php echo esc_html( $currency_symbol . $price ); ?></span>
             </div>
 
             <?php /* ── Consent ──────────────────────────────────── */ ?>
@@ -243,26 +265,32 @@ class BuyFormHandler {
                 <legend class="drb-legend"><?php esc_html_e( 'Communication preferences', 'duck-race' ); ?></legend>
                 <label class="drb-check-label">
                     <input type="checkbox" name="consent_duck_race" value="1" id="drb-consent-duck-race" />
-                    <span><?php esc_html_e( 'Contact me about future duck races', 'duck-race' ); ?></span>
+                    <span><?php echo esc_html( '' !== $consent_label_1 ? $consent_label_1 : __( 'Contact me about future duck races', 'duck-race' ) ); ?></span>
                 </label>
                 <label class="drb-check-label">
                     <input type="checkbox" name="consent_organisation" value="1" id="drb-consent-organisation" />
-                    <span>
-                    <?php
-                    if ( '' !== $org_name ) {
+                    <span><?php
+                    if ( '' !== $consent_label_2 ) {
+                        echo esc_html( str_replace( '{organisation_name}', $org_name, $consent_label_2 ) );
+                    } elseif ( '' !== $org_name ) {
                         printf( esc_html__( 'Contact me about other %s activities', 'duck-race' ), esc_html( $org_name ) );
                     } else {
                         esc_html_e( 'Contact me about other organisation activities', 'duck-race' );
                     }
-                    ?>
-                    </span>
+                    ?></span>
                 </label>
+                <?php if ( '' !== $privacy_url ) : ?>
+                <p style="margin:8px 0 0;font-size:0.85em;color:#555;">
+                    <a href="<?php echo esc_url( $privacy_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Privacy policy', 'duck-race' ); ?></a>
+                </p>
+                <?php endif; ?>
                 <p id="drb-consent-imported" style="display:none;margin:6px 0 0;font-size:13px;color:#555;">
                     <?php esc_html_e( 'Consent settings imported from your previous visit — untick to change.', 'duck-race' ); ?>
                 </p>
             </fieldset>
 
             <?php /* ── Gift Aid ─────────────────────────────────── */ ?>
+            <?php if ( $show_gift_aid ) : ?>
             <fieldset class="drb-fieldset drb-gift-aid-fieldset">
                 <legend class="drb-legend"><?php esc_html_e( 'Gift Aid', 'duck-race' ); ?></legend>
                 <label class="drb-check-label">
@@ -281,6 +309,7 @@ class BuyFormHandler {
                     <?php esc_html_e( 'Your home address (entered above) is required for Gift Aid — please ensure it is filled in correctly.', 'duck-race' ); ?>
                 </p>
             </fieldset>
+            <?php endif; ?>
 
             <?php /* ── Honeypot ─────────────────────────────────── */ ?>
             <p style="display:none;" aria-hidden="true">
@@ -413,12 +442,16 @@ class BuyFormHandler {
         }
         self::$script_queued = true;
 
-        $storage_key = 'drb_form_' . $race_id;
-        $price_json  = (string) json_encode( $price_raw );
-        $key_json    = (string) json_encode( $storage_key );
-        $url_json    = (string) json_encode( $check_email_url );
+        $settings        = get_option( 'duck_race_settings', [] );
+        $currency_symbol = (string) ( $settings['currency_symbol'] ?? '£' );
 
-        add_action( 'wp_footer', static function () use ( $price_json, $key_json, $url_json ) {
+        $storage_key     = 'drb_form_' . $race_id;
+        $price_json      = (string) json_encode( $price_raw );
+        $key_json        = (string) json_encode( $storage_key );
+        $url_json        = (string) json_encode( $check_email_url );
+        $symbol_json     = (string) json_encode( $currency_symbol );
+
+        add_action( 'wp_footer', static function () use ( $price_json, $key_json, $url_json, $symbol_json ) {
             ?>
 <script>
 (function () {
@@ -428,9 +461,10 @@ class BuyFormHandler {
     var allRows  = document.querySelectorAll("#drb-entries .drb-entry-row");
     if (!form || !countEl || !totalEl) return;
 
-    var pricePerDuck  = <?php echo $price_json; ?>;
-    var STORAGE_KEY   = <?php echo $key_json; ?>;
-    var checkEmailUrl = <?php echo $url_json; ?>;
+    var pricePerDuck   = <?php echo $price_json; ?>;
+    var STORAGE_KEY    = <?php echo $key_json; ?>;
+    var checkEmailUrl  = <?php echo $url_json; ?>;
+    var currencySymbol = <?php echo $symbol_json; ?>;
 
     var donationEl    = document.getElementById("drb-donation");
     var donationBtns  = document.querySelectorAll(".drb-donation-btn");
@@ -458,7 +492,7 @@ class BuyFormHandler {
                 inputs[j].disabled = !show;
             }
         }
-        totalEl.textContent = "£" + (count * pricePerDuck + getDonation()).toFixed(2);
+        totalEl.textContent = currencySymbol + (count * pricePerDuck + getDonation()).toFixed(2);
     }
 
     /* ── Donation buttons ────────────────────────────────────── */
@@ -471,7 +505,7 @@ class BuyFormHandler {
 
     function updateTotal() {
         var count = parseInt((countEl && countEl.value) || "1", 10) || 1;
-        totalEl.textContent = "£" + (count * pricePerDuck + getDonation()).toFixed(2);
+        totalEl.textContent = currencySymbol + (count * pricePerDuck + getDonation()).toFixed(2);
     }
 
     for (var b = 0; b < donationBtns.length; b++) {

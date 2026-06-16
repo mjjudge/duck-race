@@ -189,7 +189,9 @@ class CheckoutController {
         array_unshift( $log, $entry );
         update_option( 'duck_race_checkout_error_log', array_slice( $log, 0, 20 ), false );
 
-        $url = add_query_arg( [ 'error' => rawurlencode( $message ) ], home_url( '/duck-race-failure' ) );
+        $settings     = get_option( 'duck_race_settings', [] );
+        $failure_slug = (string) ( $settings['failure_page_slug'] ?? 'duck-race-failure' );
+        $url = add_query_arg( [ 'error' => rawurlencode( $message ) ], home_url( '/' . $failure_slug ) );
         wp_safe_redirect( $url );
         exit;
     }
