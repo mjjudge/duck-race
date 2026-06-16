@@ -366,13 +366,21 @@ class DuckGridPage {
         echo '<button type="button" class="button button-secondary" id="duck-detail-close">' . esc_html__( 'Close', 'duck-race' ) . '</button>';
         echo '</p>';
 
-        echo '<div id="duck-reassign-section" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #ddd;">';
-        echo '<p><strong>' . esc_html__( 'Reassign to duck #', 'duck-race' ) . '</strong></p>';
+        echo '<div id="duck-reassign-section" style="display:none;margin-top:14px;padding-top:14px;border-top:2px solid #ddd;">';
+        echo '<h4 style="margin:0 0 10px;">' . esc_html__( 'Reassign Duck Number', 'duck-race' ) . '</h4>';
+        echo '<div style="background:#fff3cd;border-left:4px solid #d97706;padding:10px 14px;margin-bottom:12px;font-size:0.88em;border-radius:0 4px 4px 0;">';
+        echo '<strong>' . esc_html__( '⚠ Permission required', 'duck-race' ) . '</strong><br />';
+        echo esc_html__( 'Only reassign a duck number with the buyer\'s knowledge and agreement. Their record is updated immediately to the new number. You must notify them separately — no email is sent automatically.', 'duck-race' );
+        echo '</div>';
+        echo '<p><label for="duck-reassign-target"><strong>' . esc_html__( 'Move to duck number:', 'duck-race' ) . '</strong></label><br />';
+        echo '<input type="number" name="new_duck_number" id="duck-reassign-target" min="1" style="width:110px;margin-top:6px;" placeholder="' . esc_attr__( 'e.g. 123', 'duck-race' ) . '" /></p>';
+        $reassign_confirm = __( "Reassign this duck to the new number?\n\nOnly proceed if you have the buyer's permission. The change is immediate. Use Manual Sales afterwards to assign the freed number to its correct owner.\n\nProceed?", 'duck-race' );
         echo '<p>';
-        echo '<input type="number" name="new_duck_number" id="duck-reassign-target" min="1" style="width:90px;" placeholder="' . esc_attr__( 'New #', 'duck-race' ) . '" /> ';
-        echo '<button type="submit" class="button button-secondary" name="operation" value="reassign" onclick="return confirm(' . esc_attr( wp_json_encode( __( 'Move this duck to the new number? The original number will be freed.', 'duck-race' ) ) ) . ');">' . esc_html__( 'Reassign', 'duck-race' ) . '</button>';
+        echo '<button type="submit" class="button button-warning" name="operation" value="reassign" style="background:#d97706;color:#fff;border-color:#b45309;" onclick="return confirm(' . esc_attr( wp_json_encode( $reassign_confirm ) ) . ');">';
+        echo esc_html__( 'Reassign Duck', 'duck-race' );
+        echo '</button>';
         echo '</p>';
-        echo '<p class="description">' . esc_html__( 'Moves this entry to the new number. The original number is freed so it can be manually assigned to its correct owner.', 'duck-race' ) . '</p>';
+        echo '<p class="description">' . esc_html__( 'The original number is freed once reassigned.', 'duck-race' ) . '</p>';
         echo '</div>';
 
         echo '</form>';
@@ -400,19 +408,23 @@ class DuckGridPage {
         echo 'numberInput.value=detail.duck||0;';
         echo 'commentInput.value=detail.duck_comment||"";';
 
+        // Human-readable status labels.
+        echo 'var statusLabels={"available":"Available","sold_online":"Sold (online)","sold_manual":"Sold (in person)","reserved":"Reserved — awaiting payment","lost":"Lost","winner":"Winner"};';
+
         echo 'let html="";';
         echo 'html+="<p><strong>Duck #:</strong> "+(detail.duck||"")+"</p>";';
-        echo 'html+="<p><strong>Status:</strong> "+(detail.status||"")+"</p>";';
+        echo 'var statusLabel=statusLabels[detail.status]||detail.status;';
+        echo 'html+="<p><strong>Status:</strong> "+statusLabel+"</p>";';
         echo 'if(detail.duck_name){html+="<p><strong>Name for duck:</strong> "+detail.duck_name+"</p>";}';
+        echo 'if(detail.contact_name||detail.organisation_name){html+="<p><strong>Buyer:</strong> "+(detail.organisation_name||detail.contact_name)+"</p>";}';
+        echo 'if(detail.contact_email){html+="<p><strong>Email:</strong> "+detail.contact_email+"</p>";}';
+        echo 'if(detail.contact_phone){html+="<p><strong>Phone:</strong> "+detail.contact_phone+"</p>";}';
         echo 'if(detail.purchase_id){html+="<p><strong>Purchase:</strong> #"+detail.purchase_id+" ("+(detail.payment_status||"")+", "+(detail.purchase_source||"")+")</p>";}';
         echo 'if(detail.winner_position){';
         echo 'let wp="<p><strong>Winner:</strong> Position "+detail.winner_position;';
         echo 'if(detail.prize_label){wp+=" &mdash; "+detail.prize_label;}';
         echo 'wp+="</p>";html+=wp;';
         echo '}';
-        echo 'if(detail.contact_name||detail.organisation_name){html+="<p><strong>Buyer:</strong> "+(detail.organisation_name||detail.contact_name)+"</p>";}';
-        echo 'if(detail.contact_email){html+="<p><strong>Email:</strong> "+detail.contact_email+"</p>";}';
-        echo 'if(detail.contact_phone){html+="<p><strong>Phone:</strong> "+detail.contact_phone+"</p>";}';
         echo 'if(detail.status==="available"){';
         echo 'var sellUrl=manualSaleBase+"&duck_number="+detail.duck+"&race_id="+gridRaceId;';
         echo 'html+="<p><a href=\""+sellUrl+"\" class=\"button button-small\">Mark as Sold (manual sale)</a></p>";';
@@ -423,10 +435,11 @@ class DuckGridPage {
         echo '}';
         echo 'body.innerHTML=html;';
 
-        // Show only the relevant lost/found button based on current status
+        // Show buttons relevant to the duck status.
+        // isReassignable: fix — raw status values are "sold_online" / "sold_manual", NOT "sold".
         echo 'const isLost=(detail.status==="lost");';
         echo 'const isAvailable=(detail.status==="available");';
-        echo 'const isReassignable=(detail.status==="sold"||detail.status==="reserved");';
+        echo 'const isReassignable=(detail.status==="sold_online"||detail.status==="sold_manual"||detail.status==="reserved");';
         echo 'btnLost.style.display=isAvailable?"":"none";';
         echo 'btnFound.style.display=isLost?"":"none";';
         echo 'reassignSection.style.display=isReassignable?"":"none";';
