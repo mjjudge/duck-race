@@ -295,8 +295,7 @@ class BuyFormHandler {
                 <legend class="drb-legend"><?php esc_html_e( 'Gift Aid', 'duck-race' ); ?></legend>
                 <label class="drb-check-label">
                     <input type="checkbox" name="gift_aid" value="1" id="drb-gift-aid" />
-                    <span>
-                        <strong><?php esc_html_e( 'Boost your contribution by 25% at no cost to you!', 'duck-race' ); ?></strong><br />
+                    <span><strong><?php esc_html_e( 'Boost your contribution by 25% at no cost to you!', 'duck-race' ); ?></strong><br />
                         <span class="drb-hint" style="margin-top:4px;display:block;">
                             <?php esc_html_e( 'If you are a UK taxpayer, we can claim an extra 25p for every £1 you pay — on your duck entry fee and any donation — through Gift Aid.', 'duck-race' ); ?>
                         </span>
@@ -324,10 +323,7 @@ class BuyFormHandler {
                     Simulate Checkout (Test Mode)
                 </button>
                 <?php else : ?>
-                <button type="submit" class="drb-checkout-btn"<?php echo $effective_max <= 0 ? ' disabled' : ''; ?>>
-                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                    <?php esc_html_e( 'Proceed to Checkout', 'duck-race' ); ?>
-                </button>
+                <button type="submit" class="drb-checkout-btn"<?php echo $effective_max <= 0 ? ' disabled' : ''; ?>><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><span><?php esc_html_e( 'Proceed to Checkout', 'duck-race' ); ?></span></button>
                 <?php endif; ?>
             </div>
 
@@ -388,7 +384,7 @@ class BuyFormHandler {
         .drb-donation-btn.drb-donation-btn--active{border-color:#1d4ed8;background:#eff6ff;color:#1d4ed8;}
         .drb-gift-aid-fieldset{background:#fffbeb;border-color:#dfbe00;}
         .drb-submit-row{margin-top:8px;}
-        .drb-checkout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 32px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:1.15em;font-weight:700;cursor:pointer;letter-spacing:.01em;transition:background .15s,transform .1s;text-decoration:none;}
+        .drb-checkout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 32px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:1.15em;font-weight:700;line-height:1.2;cursor:pointer;letter-spacing:.01em;transition:background .15s,transform .1s;text-decoration:none;text-transform:none;}
         .drb-checkout-btn:hover{background:#1e40af;}
         .drb-checkout-btn:active{transform:scale(.98);}
         .drb-checkout-btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px;}
