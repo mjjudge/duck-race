@@ -348,9 +348,9 @@ class BuyFormHandler {
     private function render_styles( string $duck_icon_url ): void {
         ?>
         <style>
-        .duck-race-buy-wrap{max-width:600px;margin:0 auto;font-family:inherit;}
+        .duck-race-buy-wrap{max-width:600px;margin:0 auto;font-family:inherit;line-height:1.5;}
         .duck-race-event-header{background:#f5ef9a;border-left:4px solid #dfbe00;padding:14px 18px;margin-bottom:28px;border-radius:4px;}
-        .duck-race-event-title{margin:0 0 4px;font-size:1.45em;font-weight:700;}
+        .duck-race-event-title{margin:0 0 4px;font-size:1.45em;font-weight:700;line-height:1.3;}
         .duck-race-event-meta{margin:0;color:#555;font-size:0.97em;}
         .duck-race-form-error-banner{background:#fee2e2;border:1px solid #f87171;border-radius:4px;padding:10px 14px;margin-bottom:16px;color:#7f1d1d;}
         .duck-race-buy-form .drb-row{margin-bottom:18px;}
@@ -379,8 +379,8 @@ class BuyFormHandler {
         .drb-total-amount{font-size:1.5em;font-weight:700;color:#1a1a1a;}
         .drb-fieldset{border:1px solid #e0e0e0;border-radius:4px;padding:14px 16px;margin-bottom:18px;}
         .drb-fieldset .drb-legend{font-size:1em;margin-bottom:10px;}
-        .drb-check-label{display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;font-size:0.95em;margin-bottom:8px;}
-        .drb-check-label input{margin-top:2px;flex-shrink:0;width:18px;height:18px;cursor:pointer;}
+        .duck-race-buy-form .drb-check-label{display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;font-size:0.95em;margin-bottom:8px;}
+        .duck-race-buy-form .drb-check-label input{margin-top:2px;flex-shrink:0;width:18px;height:18px;cursor:pointer;}
         .drb-label{display:block;font-weight:600;margin-bottom:8px;font-size:0.93em;color:#222;}
         .drb-donation-buttons{display:flex;gap:8px;flex-wrap:wrap;}
         .drb-donation-btn{padding:8px 18px;border:2px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;font-size:0.97em;font-weight:600;color:#333;transition:border-color .15s,background .15s;}
