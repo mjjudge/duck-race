@@ -234,6 +234,81 @@ class DuckGridPage {
             $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, '', true );
         }
 
+        if ( 'reassign' === $operation ) {
+            $new_duck_number = (int) ( $_POST['new_duck_number'] ?? 0 );
+
+            if ( $new_duck_number <= 0 ) {
+                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, __( 'Please enter a valid target duck number.', 'duck-race' ) );
+            }
+
+            if ( $new_duck_number === $duck_number ) {
+                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, __( 'Target duck number is the same as the current number.', 'duck-race' ) );
+            }
+
+            if ( $new_duck_number < (int) $race->total_range_start || $new_duck_number > (int) $race->total_range_end ) {
+                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, __( 'Target duck number is outside the race range.', 'duck-race' ) );
+            }
+
+            $entries_table = Schema::table_name( 'entries' );
+
+            // Source entry must exist and be in a reassignable state.
+            $entry = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$entries_table} WHERE race_id = %d AND duck_number = %d LIMIT 1",
+                    $race_id,
+                    $duck_number
+                )
+            );
+
+            if ( ! is_object( $entry ) ) {
+                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, __( 'No entry found for this duck.', 'duck-race' ) );
+            }
+
+            $reassignable = [ 'sold_online', 'sold_manual', 'reserved' ];
+            if ( ! in_array( (string) $entry->entry_status, $reassignable, true ) ) {
+                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, __( 'This duck cannot be reassigned (winner or voided entries are locked).', 'duck-race' ) );
+            }
+
+            // Target must be free (no existing entry in this race).
+            $target_taken = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$entries_table} WHERE race_id = %d AND duck_number = %d",
+                    $race_id,
+                    $new_duck_number
+                )
+            );
+
+            if ( $target_taken > 0 ) {
+                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, sprintf( __( 'Duck #%d is already taken.', 'duck-race' ), $new_duck_number ) );
+            }
+
+            // Target must not be physically lost.
+            if ( $service->is_lost( $new_duck_number ) ) {
+                $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, sprintf( __( 'Duck #%d is marked as lost and cannot be assigned.', 'duck-race' ), $new_duck_number ) );
+            }
+
+            $wpdb->update(
+                $entries_table,
+                [ 'duck_number' => $new_duck_number, 'updated_at' => $now ],
+                [ 'id' => (int) $entry->id ]
+            );
+
+            Logger::log(
+                'duck.reassigned',
+                'duck',
+                $duck_number,
+                [ 'duck_number' => $duck_number ],
+                [ 'duck_number' => $new_duck_number ],
+                [
+                    'race_id'    => $race_id,
+                    'purchase_id' => (int) $entry->purchase_id,
+                    'contact_id' => (int) $entry->contact_id,
+                ]
+            );
+
+            $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, '', true );
+        }
+
         $this->redirect_grid( $race_id, $filter, $search, $page, $per_page, __( 'Unsupported duck status operation.', 'duck-race' ) );
     }
 
@@ -290,6 +365,16 @@ class DuckGridPage {
         echo '<button type="submit" class="button button-primary" id="duck-btn-comment" name="operation" value="save_comment">' . esc_html__( 'Save Comment', 'duck-race' ) . '</button> ';
         echo '<button type="button" class="button button-secondary" id="duck-detail-close">' . esc_html__( 'Close', 'duck-race' ) . '</button>';
         echo '</p>';
+
+        echo '<div id="duck-reassign-section" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #ddd;">';
+        echo '<p><strong>' . esc_html__( 'Reassign to duck #', 'duck-race' ) . '</strong></p>';
+        echo '<p>';
+        echo '<input type="number" name="new_duck_number" id="duck-reassign-target" min="1" style="width:90px;" placeholder="' . esc_attr__( 'New #', 'duck-race' ) . '" /> ';
+        echo '<button type="submit" class="button button-secondary" name="operation" value="reassign" onclick="return confirm(' . esc_attr( wp_json_encode( __( 'Move this duck to the new number? The original number will be freed.', 'duck-race' ) ) ) . ');">' . esc_html__( 'Reassign', 'duck-race' ) . '</button>';
+        echo '</p>';
+        echo '<p class="description">' . esc_html__( 'Moves this entry to the new number. The original number is freed so it can be manually assigned to its correct owner.', 'duck-race' ) . '</p>';
+        echo '</div>';
+
         echo '</form>';
 
         echo '</div>';
@@ -306,6 +391,8 @@ class DuckGridPage {
         echo 'const closeBtn=document.getElementById("duck-detail-close");';
         echo 'const btnLost=document.getElementById("duck-btn-lost");';
         echo 'const btnFound=document.getElementById("duck-btn-found");';
+        echo 'const reassignSection=document.getElementById("duck-reassign-section");';
+        echo 'const reassignTarget=document.getElementById("duck-reassign-target");';
 
         echo 'document.querySelectorAll(".duck-race-tile").forEach(function(tile){';
         echo 'tile.addEventListener("click",function(){';
@@ -339,8 +426,11 @@ class DuckGridPage {
         // Show only the relevant lost/found button based on current status
         echo 'const isLost=(detail.status==="lost");';
         echo 'const isAvailable=(detail.status==="available");';
+        echo 'const isReassignable=(detail.status==="sold"||detail.status==="reserved");';
         echo 'btnLost.style.display=isAvailable?"":"none";';
         echo 'btnFound.style.display=isLost?"":"none";';
+        echo 'reassignSection.style.display=isReassignable?"":"none";';
+        echo 'if(isReassignable){reassignTarget.value="";}';
 
         echo 'modal.style.display="block";';
         echo '});';

@@ -225,6 +225,12 @@ Goal: Address bugs, UX issues, and usability gaps identified during live user te
 | DR-184 | Handle charge.refunded Stripe webhook event | P1 |
 | DR-185 | Send refund confirmation email to buyer | P2 |
 
+### Phase 19 - Duck Reassignment
+
+| ID | Item | Priority |
+| --- | --- | --- |
+| DR-190 | Reassign duck number from duck grid modal | P0 |
+
 ## Delivery Principle
 
 Build the full v1.1 vision progressively. MVP is not a separate reduced product; it is the point in the backlog where the system is usable for a real duck race.
@@ -1211,6 +1217,26 @@ Acceptance Criteria
     • Returns 200 for unknown purchases (Stripe may send events for non-plugin charges).
 Dependencies
 DR-182, DR-072.
+
+EPIC 19 — Duck Reassignment
+
+DR-190 — Reassign duck number from duck grid modal
+Description
+When a duck number has been pre-sold manually and then inadvertently sold again online (or vice versa), an admin needs to move the online buyer's duck to a different available number to free up the original for its correct owner. The reassignment must be auditable and must not break financial records.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Duck detail modal shows a "Reassign to duck #" input and button for any duck in sold_online, sold_manual or reserved state.
+    • Admin enters a target duck number and submits.
+    • System validates: target number is within the race range, target number is not already sold/reserved/lost, source duck is not a winner.
+    • The duck_number on the entry row is updated atomically.
+    • The original duck number is freed (visible as available in the grid).
+    • Audit log records: event duck.reassigned, before {duck_number: old}, after {duck_number: new}, context {race_id, purchase_id, contact_id}.
+    • Winner ducks cannot be reassigned.
+    • Physical duck state (lost/found/comments) stays with the physical duck number, not the entry.
+    • After reassignment admin can use Manual Sale to assign the freed number to its correct owner.
+Dependencies
+DR-122, DR-014.
 
 DR-185 — Send refund confirmation email to buyer
 Description

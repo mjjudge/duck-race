@@ -21,7 +21,7 @@ class Menu {
             'duck_race_access',
             self::TOP_LEVEL_SLUG,
             '',
-            plugins_url( 'assets/images/duck-menu-icon.svg', DUCK_RACE_PLUGIN_FILE ),
+            $this->duck_icon_uri(),
             56
         );
 
@@ -141,5 +141,13 @@ class Menu {
             'duck-race-settings',
             [ new SettingsPage(), 'render' ]
         );
+    }
+
+    private function duck_icon_uri(): string {
+        $path = DUCK_RACE_PLUGIN_DIR . 'assets/images/duck-menu-icon.svg';
+        if ( ! file_exists( $path ) ) {
+            return 'dashicons-flag';
+        }
+        return 'data:image/svg+xml;base64,' . base64_encode( (string) file_get_contents( $path ) );
     }
 }
