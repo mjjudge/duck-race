@@ -3,7 +3,7 @@
  * Plugin Name: Duck Race
  * Plugin URI:  https://github.com/mjjudge/duck-race
  * Description: Reusable WordPress fundraising platform for running duck races.
- * Version:     0.20.0
+ * Version:     0.21.0
  * Requires at least: 6.0
  * Requires PHP: 8.2
  * Author:      Duck Race Contributors
@@ -14,10 +14,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DUCK_RACE_VERSION', '0.20.0' );
+define( 'DUCK_RACE_VERSION', '0.21.0' );
 define( 'DUCK_RACE_PLUGIN_FILE', __FILE__ );
 define( 'DUCK_RACE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DUCK_RACE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'DUCK_RACE_COFFEE_URL', 'https://buymeacoffee.com/marcusjudge' );
+define( 'DUCK_RACE_ROTARY_URL', 'https://rotaryinthevale.org/' );
 
 // Maps DuckRace\Foo\Bar to plugin/src/Foo/Bar.php.
 spl_autoload_register( static function ( string $class ): void {

@@ -245,7 +245,16 @@ See [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) for the full architecture reference a
 
 ---
 
-## Support and contributing
+## Support the project
+
+Duck Race is free and open source. If it has helped your club raise money and enjoy a great event, please consider:
+
+- [☕ Buy the Developer a Coffee](https://buymeacoffee.com/marcusjudge) — a small token of appreciation for the hours spent building and maintaining this plugin
+- [❤️ Donate to Rotary in the Vale](https://rotaryinthevale.org/) — support the Rotary club that originally commissioned this software and continues to use it to raise funds for the local community
+
+---
+
+## Contributing and issues
 
 - Issues: [GitHub Issues](https://github.com/mjjudge/duck-race/issues)
 - Contributions welcome via pull request — please read [AGENTS.md](AGENTS.md) first.

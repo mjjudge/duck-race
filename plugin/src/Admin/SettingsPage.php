@@ -463,6 +463,23 @@ class SettingsPage {
             esc_html__( 'For setup and operating guidance, visit the %s page.', 'duck-race' ),
             '<a href="' . esc_url( admin_url( 'admin.php?page=duck-race-help' ) ) . '">' . esc_html__( 'Help', 'duck-race' ) . '</a>'
         ) . '</p>';
+
+        echo '<hr />';
+        echo '<h2>' . esc_html__( 'Support Development', 'duck-race' ) . '</h2>';
+        echo '<p style="max-width:700px;">' . esc_html__( 'Duck Race is free and open source software. If it has helped your club run a successful fundraiser, please consider:', 'duck-race' ) . '</p>';
+        echo '<p>';
+        $coffee_url = apply_filters( 'duck_race_coffee_url', defined( 'DUCK_RACE_COFFEE_URL' ) ? DUCK_RACE_COFFEE_URL : '' );
+        $rotary_url = defined( 'DUCK_RACE_ROTARY_URL' ) ? DUCK_RACE_ROTARY_URL : 'https://rotaryinthevale.org/';
+        if ( '' !== $coffee_url ) {
+            echo '<a href="' . esc_url( $coffee_url ) . '" target="_blank" rel="noopener noreferrer" class="button button-secondary" style="margin-right:8px;" aria-label="' . esc_attr__( 'Buy the developer a coffee — opens in new tab', 'duck-race' ) . '">';
+            echo esc_html__( '☕ Buy the Developer a Coffee', 'duck-race' );
+            echo '</a>';
+        }
+        echo '<a href="' . esc_url( $rotary_url ) . '" target="_blank" rel="noopener noreferrer" class="button button-secondary" aria-label="' . esc_attr__( 'Donate to Rotary in the Vale — opens in new tab', 'duck-race' ) . '">';
+        echo esc_html__( '❤️ Donate to Rotary in the Vale', 'duck-race' );
+        echo '</a>';
+        echo '</p>';
+
         echo '</div>';
 
         ?>

@@ -17,6 +17,7 @@ class RaceListPage {
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__( 'Races', 'duck-race' ) . '</h1>';
+        SupportBanner::maybe_render();
         echo '<p>' . esc_html__( 'Create, edit and manage race lifecycle.', 'duck-race' ) . '</p>';
         echo '<p><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=duck-race-race-edit' ) ) . '">' . esc_html__( 'Create Race', 'duck-race' ) . '</a></p>';
 

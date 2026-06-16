@@ -250,6 +250,7 @@ Goal: Any club anywhere can install and run the plugin without touching code.
 | ID | Item | Priority |
 | --- | --- | --- |
 | DR-220 | Rewrite README.md as an engaging, accessible document for any club | P1 |
+| DR-221 | Community support and donation links (settings section, dismissible banner, README section) | P2 |
 
 ### Phase 19 - Duck Reassignment
 
@@ -1417,3 +1418,20 @@ Acceptance Criteria
     • Failure to send email does not roll back the refund.
 Dependencies
 DR-182, DR-080.
+
+DR-221 — Community support and donation links
+Description
+Non-intrusive visibility for developer support and the Rotary donation link. Plugin remains free and MIT-licensed. No tracking or external requests are made automatically.
+Status
+    • [x] Complete
+Acceptance Criteria
+    • Settings page has a "Support Development" section with two buttons: ☕ Buy the Developer a Coffee and ❤️ Donate to Rotary in the Vale, both opening in a new tab.
+    • Races list page shows a dismissible green banner for site administrators. Dismissal is stored as user meta and is permanent.
+    • Dismiss is via an AJAX nonce-protected call; no page reload required.
+    • Banner never appears to non-admins.
+    • Coffee URL is defined via DUCK_RACE_COFFEE_URL constant (filterable via duck_race_coffee_url hook).
+    • Rotary URL is defined via DUCK_RACE_ROTARY_URL constant.
+    • README has a "Support the project" section linking to both URLs.
+    • No analytics, no cookies, no external requests automatically.
+Dependencies
+DR-220.

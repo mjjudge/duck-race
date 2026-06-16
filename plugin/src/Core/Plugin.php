@@ -41,6 +41,7 @@ class Plugin {
         add_action( \DuckRace\Services\ReservationCleanupService::CRON_HOOK, [ new \DuckRace\Services\ReservationCleanupService(), 'run_scheduled' ] );
 
         if ( is_admin() ) {
+            \DuckRace\Admin\SupportBanner::register_ajax();
             ( new \DuckRace\Admin\Menu() )->register();
             ( new \DuckRace\Admin\SettingsPage() )->register();
             ( new \DuckRace\Admin\RaceEditPage() )->register();
