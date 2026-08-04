@@ -2,6 +2,7 @@
 
 namespace DuckRace\Rest;
 
+use DuckRace\Security\RequestGuard;
 use DuckRace\Services\DuckAllocationService;
 use DuckRace\Services\RaceService;
 
@@ -38,6 +39,8 @@ class DuckPreviewRoute {
     }
 
     public function handle( \WP_REST_Request $request ): \WP_REST_Response {
+        RequestGuard::send_nocache_headers();
+
         $race_id = (int) $request->get_param( 'race_id' );
         $count   = min( 100, (int) $request->get_param( 'count' ) );
 

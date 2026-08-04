@@ -2,6 +2,7 @@
 
 namespace DuckRace\Rest;
 
+use DuckRace\Security\RequestGuard;
 use DuckRace\Services\PurchaseService;
 use DuckRace\Services\StripeWebhookProcessor;
 use DuckRace\Services\StripeService;
@@ -27,6 +28,8 @@ class StripeWebhookRoute {
     }
 
     public function handle( \WP_REST_Request $request ): \WP_REST_Response {
+        RequestGuard::send_nocache_headers();
+
         $raw       = (string) $request->get_body();
         // Use the WP_REST_Request header accessor — more reliable across server/proxy configs
         // than reading directly from $_SERVER['HTTP_STRIPE_SIGNATURE'].

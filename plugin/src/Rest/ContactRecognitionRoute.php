@@ -2,6 +2,7 @@
 
 namespace DuckRace\Rest;
 
+use DuckRace\Security\RequestGuard;
 use DuckRace\Services\ContactService;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,6 +33,8 @@ class ContactRecognitionRoute {
     }
 
     public function handle_check_email( \WP_REST_Request $request ): \WP_REST_Response {
+        RequestGuard::send_nocache_headers();
+
         $email = sanitize_email( (string) ( $request->get_param( 'email' ) ?? '' ) );
 
         if ( '' === $email || ! is_email( $email ) ) {

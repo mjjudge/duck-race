@@ -21,6 +21,8 @@ class CheckoutController {
     }
 
     public function start_checkout(): void {
+        RequestGuard::send_nocache_headers();
+
         if ( ! RequestGuard::verify_public_nonce( self::NONCE_ACTION, 'duck_race_nonce' ) ) {
             $this->redirect_failure( __( 'Security check failed.', 'duck-race' ) );
         }

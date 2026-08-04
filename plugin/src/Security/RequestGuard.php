@@ -30,4 +30,16 @@ class RequestGuard {
 
         return '' === $value;
     }
+
+    /**
+     * Marks the current response as non-cacheable. Purchase-flow pages and endpoints render
+     * per-visitor state (nonces, live duck availability, payment status) that a page cache or
+     * CDN must never serve to a second visitor. Must be called before any output starts.
+     */
+    public static function send_nocache_headers(): void {
+        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
+        nocache_headers();
+    }
 }

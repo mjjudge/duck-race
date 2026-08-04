@@ -2,6 +2,7 @@
 
 namespace DuckRace\Public;
 
+use DuckRace\Security\RequestGuard;
 use DuckRace\Services\DuckAllocationService;
 use DuckRace\Services\RaceService;
 
@@ -19,6 +20,26 @@ class BuyFormHandler {
 
     public function register(): void {
         add_shortcode( 'duck_race_buy', [ $this, 'render_shortcode' ] );
+        add_action( 'template_redirect', [ $this, 'prevent_caching' ] );
+    }
+
+    /**
+     * The buy form bakes live duck availability and a single-use nonce into the HTML on every
+     * render — a cached copy hands every visitor the same sold-out duck number and an expired
+     * nonce. Must run before any output starts, so this is hooked to template_redirect rather
+     * than the shortcode callback.
+     */
+    public function prevent_caching(): void {
+        if ( ! is_singular() ) {
+            return;
+        }
+
+        $post = get_post();
+        if ( ! $post instanceof \WP_Post || ! has_shortcode( (string) $post->post_content, 'duck_race_buy' ) ) {
+            return;
+        }
+
+        RequestGuard::send_nocache_headers();
     }
 
     public function render_shortcode(): string {

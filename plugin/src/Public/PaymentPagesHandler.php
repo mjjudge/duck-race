@@ -2,6 +2,8 @@
 
 namespace DuckRace\Public;
 
+use DuckRace\Security\RequestGuard;
+
 defined( 'ABSPATH' ) || exit;
 
 class PaymentPagesHandler {
@@ -9,6 +11,30 @@ class PaymentPagesHandler {
     public function register(): void {
         add_shortcode( 'duck_race_payment_success', [ $this, 'success_shortcode' ] );
         add_shortcode( 'duck_race_payment_failure', [ $this, 'failure_shortcode' ] );
+        add_action( 'template_redirect', [ $this, 'prevent_caching' ] );
+    }
+
+    /**
+     * The failure page echoes a per-request ?error= message and the success page carries a
+     * per-buyer ?purchase_id= — a cached copy would show one visitor's payment result to the
+     * next. Must run before any output starts, so this is hooked to template_redirect.
+     */
+    public function prevent_caching(): void {
+        if ( ! is_singular() ) {
+            return;
+        }
+
+        $post = get_post();
+        if ( ! $post instanceof \WP_Post ) {
+            return;
+        }
+
+        $content = (string) $post->post_content;
+        if ( ! has_shortcode( $content, 'duck_race_payment_success' ) && ! has_shortcode( $content, 'duck_race_payment_failure' ) ) {
+            return;
+        }
+
+        RequestGuard::send_nocache_headers();
     }
 
     public function success_shortcode(): string {
