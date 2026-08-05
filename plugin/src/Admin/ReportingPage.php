@@ -158,7 +158,7 @@ class ReportingPage {
         $rows = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT p.id, p.grand_total, p.created_at, p.stripe_checkout_session_id,
-                        c.first_name, c.last_name, c.email,
+                        c.id AS contact_id, c.first_name, c.last_name, c.email, c.created_at AS contact_created_at,
                         GROUP_CONCAT(e.duck_number ORDER BY e.duck_number SEPARATOR ', ') AS duck_numbers
                  FROM {$purchases_table} p
                  LEFT JOIN {$contacts_table} c ON c.id = p.contact_id
@@ -190,10 +190,13 @@ class ReportingPage {
         foreach ( $rows as $row ) {
             $name    = trim( (string) $row->first_name . ' ' . (string) $row->last_name );
             $email   = (string) $row->email;
+            $email_display = '' !== $email
+                ? $email
+                : ( ! empty( $row->contact_id ) ? \DuckRace\Services\ContactService::no_email_display( (int) $row->contact_id, (string) $row->contact_created_at ) : '' );
             $session = (string) $row->stripe_checkout_session_id;
             echo '<tr>';
             echo '<td>' . esc_html( (string) $row->id ) . '</td>';
-            echo '<td>' . esc_html( $name ?: '—' ) . ( $email ? ' <br><small>' . esc_html( $email ) . '</small>' : '' ) . '</td>';
+            echo '<td>' . esc_html( $name ?: '—' ) . ( $email_display ? ' <br><small>' . esc_html( $email_display ) . '</small>' : '' ) . '</td>';
             echo '<td>' . esc_html( (string) ( $row->duck_numbers ?: '—' ) ) . '</td>';
             echo '<td>' . esc_html( $this->money( (float) $row->grand_total ) ) . '</td>';
             echo '<td>' . esc_html( (string) $row->created_at ) . '</td>';

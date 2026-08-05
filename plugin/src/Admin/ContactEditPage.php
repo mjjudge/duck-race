@@ -12,10 +12,12 @@ class ContactEditPage {
 
     private const NONCE_ACTION          = 'duck_race_save_contact';
     private const ANONYMISE_NONCE_ACTION = 'duck_race_anonymise_contact';
+    private const MERGE_NONCE_ACTION     = 'duck_race_merge_contact';
 
     public function register(): void {
         add_action( 'admin_post_duck_race_save_contact', [ $this, 'handle_save' ] );
         add_action( 'admin_post_duck_race_anonymise_contact', [ $this, 'handle_anonymise' ] );
+        add_action( 'admin_post_duck_race_merge_contact', [ $this, 'handle_merge' ] );
     }
 
     public function render(): void {
@@ -23,13 +25,18 @@ class ContactEditPage {
 
         $contact = $this->load_contact();
         $audit_events = ( ! empty( $contact['id'] ) ) ? $this->load_recent_audit_events( (int) $contact['id'] ) : [];
+        $allow_blank_email = ( (int) $contact['id'] > 0 ) && ( '' === (string) $contact['email'] );
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__( 'Edit Contact', 'duck-race' ) . '</h1>';
         echo '<p><span style="color:#d63638;">*</span> ' . esc_html__( 'Required fields', 'duck-race' ) . '</p>';
 
         if ( isset( $_GET['updated'] ) ) {
-            echo '<div class="notice notice-success"><p>' . esc_html__( 'Contact saved.', 'duck-race' ) . '</p></div>';
+            $notice = esc_html__( 'Contact saved.', 'duck-race' );
+            if ( isset( $_GET['merged'] ) ) {
+                $notice .= ' ' . esc_html__( 'The no-email record was merged into this contact.', 'duck-race' );
+            }
+            echo '<div class="notice notice-success"><p>' . $notice . '</p></div>';
         }
 
         if ( isset( $_GET['anonymised'] ) ) {
@@ -40,6 +47,8 @@ class ContactEditPage {
             echo '<div class="notice notice-error"><p>' . esc_html( sanitize_text_field( wp_unslash( (string) ( $_GET['error'] ?? '' ) ) ) ) . '</p></div>';
         }
 
+        $this->render_merge_candidate_panel( (int) $contact['id'] );
+
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" id="contact-edit-form" novalidate>';
         echo '<input type="hidden" name="action" value="duck_race_save_contact" />';
         echo '<input type="hidden" name="contact_id" value="' . esc_attr( (string) $contact['id'] ) . '" />';
@@ -49,7 +58,12 @@ class ContactEditPage {
         $this->required_text_row( 'first_name', __( 'First name', 'duck-race' ), (string) $contact['first_name'] );
         $this->required_text_row( 'last_name', __( 'Last name', 'duck-race' ), (string) $contact['last_name'] );
         $this->text_row( 'organisation_name', __( 'Organisation', 'duck-race' ), (string) $contact['organisation_name'] );
-        $this->required_text_row( 'email', __( 'Email', 'duck-race' ), (string) $contact['email'], 'email' );
+        if ( $allow_blank_email ) {
+            $this->text_row( 'email', __( 'Email', 'duck-race' ), '', 'email' );
+            echo '<tr><th></th><td><p class="description">' . esc_html( ContactService::no_email_display( (int) $contact['id'], (string) ( $contact['created_at'] ?? '' ) ) ) . ' — ' . esc_html__( 'added from a manual sale. Enter an email above to add one.', 'duck-race' ) . '</p></td></tr>';
+        } else {
+            $this->required_text_row( 'email', __( 'Email', 'duck-race' ), (string) $contact['email'], 'email' );
+        }
         $this->phone_row( (string) $contact['phone'] );
 
         echo '<tr><th scope="row">' . esc_html__( 'Address', 'duck-race' ) . '</th><td>';
@@ -75,7 +89,7 @@ class ContactEditPage {
         echo '(function(){';
         echo 'document.getElementById("contact-edit-form").addEventListener("submit",function(e){';
         echo 'let ok=true;';
-        echo 'const req=["first_name","last_name","email"];';
+        echo 'const req=["first_name","last_name"' . ( $allow_blank_email ? '' : ',"email"' ) . '];';
         echo 'req.forEach(function(id){';
         echo 'const el=document.getElementById(id);';
         echo 'if(el&&""===el.value.trim()){';
@@ -142,6 +156,43 @@ class ContactEditPage {
         echo '</div>';
     }
 
+    private function render_merge_candidate_panel( int $source_contact_id ): void {
+        $target_id = absint( $_GET['merge_candidate'] ?? 0 );
+        $pending_email = sanitize_email( wp_unslash( (string) ( $_GET['pending_email'] ?? '' ) ) );
+        if ( $target_id <= 0 || '' === $pending_email || $source_contact_id <= 0 ) {
+            return;
+        }
+
+        $target = $this->load_contact_by_id( $target_id );
+        if ( empty( $target ) ) {
+            return;
+        }
+
+        $target_name = trim( (string) $target['first_name'] . ' ' . (string) $target['last_name'] );
+
+        echo '<div class="notice notice-warning"><p>';
+        printf(
+            /* translators: 1: email address, 2: existing contact name, 3: existing contact ID */
+            esc_html__( 'The email %1$s already belongs to an existing contact: %2$s (#%3$d).', 'duck-race' ),
+            '<strong>' . esc_html( $pending_email ) . '</strong>',
+            esc_html( $target_name ),
+            $target_id
+        );
+        echo '</p><p>' . esc_html__( 'Merging will move all purchases and duck entries from this no-email record onto that contact, and this record will be removed. Any other unsaved changes on this form will be discarded.', 'duck-race' ) . '</p>';
+
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:8px;" onsubmit="return confirm(\'' . esc_js( __( 'Merge this record into the existing contact? This cannot be undone.', 'duck-race' ) ) . '\');">';
+        echo '<input type="hidden" name="action" value="duck_race_merge_contact" />';
+        echo '<input type="hidden" name="source_contact_id" value="' . esc_attr( (string) $source_contact_id ) . '" />';
+        echo '<input type="hidden" name="target_contact_id" value="' . esc_attr( (string) $target_id ) . '" />';
+        wp_nonce_field( self::MERGE_NONCE_ACTION, '_wpnonce' );
+        echo '<button type="submit" class="button button-primary">' . esc_html__( 'Confirm Merge', 'duck-race' ) . '</button>';
+        echo '</form>';
+
+        $cancel_url = add_query_arg( [ 'page' => 'duck-race-contact-edit', 'id' => $source_contact_id ], admin_url( 'admin.php' ) );
+        echo '<a class="button" href="' . esc_url( $cancel_url ) . '">' . esc_html__( 'Cancel', 'duck-race' ) . '</a>';
+        echo '</div>';
+    }
+
     public function handle_save(): void {
         RequestGuard::require_capability( 'duck_race_manage_contacts' );
         RequestGuard::verify_admin_nonce( self::NONCE_ACTION, '_wpnonce' );
@@ -149,10 +200,14 @@ class ContactEditPage {
         $first_name = sanitize_text_field( wp_unslash( $_POST['first_name'] ?? '' ) );
         $last_name = sanitize_text_field( wp_unslash( $_POST['last_name'] ?? '' ) );
         $email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+        $contact_id = (int) ( $_POST['contact_id'] ?? 0 );
 
-        if ( '' === $first_name || '' === $last_name || '' === $email ) {
+        $existing = $contact_id > 0 ? $this->load_contact_by_id( $contact_id ) : [];
+        $existing_email = (string) ( $existing['email'] ?? '' );
+        $allow_blank_email = $contact_id > 0 && '' === $existing_email;
+
+        if ( '' === $first_name || '' === $last_name || ( '' === $email && ! $allow_blank_email ) ) {
             $error = __( 'First name, last name and email are required.', 'duck-race' );
-            $contact_id = (int) ( $_POST['contact_id'] ?? 0 );
             wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-contact-edit', 'id' => $contact_id, 'error' => rawurlencode( $error ) ], admin_url( 'admin.php' ) ) );
             exit;
         }
@@ -160,41 +215,86 @@ class ContactEditPage {
         $phone = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) );
         if ( '' !== $phone && ! preg_match( '/^[0-9 +().\-]+$/', $phone ) ) {
             $error = __( 'Please enter a valid phone number.', 'duck-race' );
-            $contact_id = (int) ( $_POST['contact_id'] ?? 0 );
             wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-contact-edit', 'id' => $contact_id, 'error' => rawurlencode( $error ) ], admin_url( 'admin.php' ) ) );
             exit;
         }
 
         $service = new ContactService();
-        $contact_id = (int) ( $_POST['contact_id'] ?? 0 );
 
         if ( $contact_id > 0 ) {
-            $existing = $this->load_contact_by_id( $contact_id );
-            if ( ! empty( $existing['email'] ) && $existing['email'] !== $email ) {
-                wp_die( esc_html__( 'Email cannot be changed on existing contacts. Use merge/update flow.', 'duck-race' ) );
+            if ( '' !== $existing_email ) {
+                if ( $existing_email !== $email ) {
+                    wp_die( esc_html__( 'Email cannot be changed on existing contacts. Use merge/update flow.', 'duck-race' ) );
+                }
+            } elseif ( '' !== $email ) {
+                // This contact currently has no email — check whether the email being
+                // added already belongs to a different contact before saving anything.
+                $match = $service->find_by_email( $email );
+                if ( $match && (int) $match->id !== $contact_id ) {
+                    wp_safe_redirect(
+                        add_query_arg(
+                            [
+                                'page' => 'duck-race-contact-edit',
+                                'id' => $contact_id,
+                                'merge_candidate' => (int) $match->id,
+                                'pending_email' => rawurlencode( $email ),
+                            ],
+                            admin_url( 'admin.php' )
+                        )
+                    );
+                    exit;
+                }
             }
         }
 
-        $saved_id = $service->upsert_by_email(
-            [
-                'first_name' => $first_name,
-                'last_name' => $last_name,
-                'organisation_name' => wp_unslash( $_POST['organisation_name'] ?? '' ),
-                'email' => $email,
-                'phone' => $phone,
-                'address_line_1' => wp_unslash( $_POST['address_line_1'] ?? '' ),
-                'address_line_2' => wp_unslash( $_POST['address_line_2'] ?? '' ),
-                'city' => wp_unslash( $_POST['city'] ?? '' ),
-                'county' => wp_unslash( $_POST['county'] ?? '' ),
-                'postcode' => wp_unslash( $_POST['postcode'] ?? '' ),
-                'consent_duck_race' => ! empty( $_POST['consent_duck_race'] ),
-                'consent_organisation' => ! empty( $_POST['consent_organisation'] ),
-                'consent_source' => 'admin',
-                'consent_timestamp' => current_time( 'mysql', true ),
-            ]
-        );
+        $fields = [
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'organisation_name' => wp_unslash( $_POST['organisation_name'] ?? '' ),
+            'email' => $email,
+            'phone' => $phone,
+            'address_line_1' => wp_unslash( $_POST['address_line_1'] ?? '' ),
+            'address_line_2' => wp_unslash( $_POST['address_line_2'] ?? '' ),
+            'city' => wp_unslash( $_POST['city'] ?? '' ),
+            'county' => wp_unslash( $_POST['county'] ?? '' ),
+            'postcode' => wp_unslash( $_POST['postcode'] ?? '' ),
+            'consent_duck_race' => ! empty( $_POST['consent_duck_race'] ),
+            'consent_organisation' => ! empty( $_POST['consent_organisation'] ),
+            'consent_source' => 'admin',
+            'consent_timestamp' => current_time( 'mysql', true ),
+        ];
+
+        // Editing a known contact updates it directly by ID — upsert_by_email is
+        // only safe when there's no specific contact_id to anchor to (creation),
+        // since it matches purely by email and could otherwise target the wrong row.
+        $saved_id = $contact_id > 0 ? $service->update_by_id( $contact_id, $fields ) : $service->upsert_by_email( $fields );
+
+        if ( $saved_id <= 0 ) {
+            $error = __( 'Could not save contact.', 'duck-race' );
+            wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-contact-edit', 'id' => $contact_id, 'error' => rawurlencode( $error ) ], admin_url( 'admin.php' ) ) );
+            exit;
+        }
 
         wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-contact-edit', 'id' => $saved_id, 'updated' => '1' ], admin_url( 'admin.php' ) ) );
+        exit;
+    }
+
+    public function handle_merge(): void {
+        RequestGuard::require_capability( 'duck_race_manage_contacts' );
+        RequestGuard::verify_admin_nonce( self::MERGE_NONCE_ACTION, '_wpnonce' );
+
+        $source_id = (int) ( $_POST['source_contact_id'] ?? 0 );
+        $target_id = (int) ( $_POST['target_contact_id'] ?? 0 );
+
+        $result = ( new ContactService() )->merge_no_email_contact( $source_id, $target_id );
+
+        if ( ! $result['success'] ) {
+            $error = $result['reason'] ?? __( 'Could not merge contacts.', 'duck-race' );
+            wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-contact-edit', 'id' => $source_id, 'error' => rawurlencode( $error ) ], admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-contact-edit', 'id' => $result['target_id'], 'updated' => '1', 'merged' => '1' ], admin_url( 'admin.php' ) ) );
         exit;
     }
 
@@ -334,6 +434,7 @@ class ContactEditPage {
             'country'              => 'Country',
             'consent_duck_race'    => 'Duck race consent',
             'consent_organisation' => 'Organisation consent',
+            'merged_from'          => 'Merged from',
         ];
 
         $all_keys = array_unique( array_merge( array_keys( $before ), array_keys( $after ) ) );
@@ -389,6 +490,7 @@ class ContactEditPage {
         return match ( $source ) {
             'online_purchase_form' => 'Online purchase',
             'manual_sale_admin'    => 'Manual sale (admin)',
+            'manual_sale_admin_no_email' => 'Manual sale (no email)',
             'admin_edit'           => 'Admin edit',
             default                => $source ?: '—',
         };

@@ -32,7 +32,12 @@ class ManualSalesPage {
         echo '<h1>' . esc_html__( 'Add Manual Sale', 'duck-race' ) . '</h1>';
 
         if ( isset( $_GET['saved'] ) ) {
-            echo '<div class="notice notice-success"><p>' . esc_html__( 'Manual sale saved.', 'duck-race' ) . '</p></div>';
+            echo '<div class="notice notice-success"><p>' . esc_html__( 'Manual sale saved.', 'duck-race' );
+            $reference = $this->no_email_reference_for_purchase( absint( $_GET['purchase_id'] ?? 0 ) );
+            if ( '' !== $reference ) {
+                echo ' ' . esc_html__( 'No email was supplied — the buyer is identified by this reference:', 'duck-race' ) . ' <strong>' . esc_html( $reference ) . '</strong>';
+            }
+            echo '</p></div>';
         }
 
         if ( isset( $_GET['error'] ) ) {
@@ -65,6 +70,10 @@ class ManualSalesPage {
         echo '<td><input class="regular-text" type="email" name="email" id="email" required />';
         echo '<p id="ms-contact-found" style="display:none;margin:4px 0 0;padding:6px 10px;background:#edfaed;border-left:3px solid #0a0;font-size:13px;">';
         echo esc_html__( 'Existing contact found — details pre-filled. Update any fields that have changed.', 'duck-race' );
+        echo '</p>';
+        echo '<p style="margin:6px 0 0;"><label><input type="checkbox" name="no_email" id="ms-no-email" value="1" /> ' . esc_html__( 'No email address supplied', 'duck-race' ) . '</label></p>';
+        echo '<p id="ms-no-email-notice" style="display:none;margin:4px 0 0;padding:6px 10px;background:#fcf0f1;border-left:3px solid #d63638;font-size:13px;">';
+        echo esc_html__( 'No email supplied. The buyer will be identified by an internal reference instead. No confirmation email will be sent, and future-communication consent cannot be recorded.', 'duck-race' );
         echo '</p></td></tr>';
         echo '<tr><th scope="row"><label for="first_name">' . esc_html__( 'First name', 'duck-race' ) . '</label></th><td><input class="regular-text" type="text" name="first_name" id="first_name" required /></td></tr>';
         echo '<tr><th scope="row"><label for="last_name">' . esc_html__( 'Last name', 'duck-race' ) . '</label></th><td><input class="regular-text" type="text" name="last_name" id="last_name" required /></td></tr>';
@@ -80,7 +89,7 @@ class ManualSalesPage {
         echo '<input style="width:160px;" type="text" name="postcode" id="ms-postcode" placeholder="' . esc_attr__( 'Postcode (optional)', 'duck-race' ) . '" />';
         echo '</td></tr>';
 
-        echo '<tr><th scope="row">' . esc_html__( 'Consent', 'duck-race' ) . '</th><td>';
+        echo '<tr id="ms-consent-row"><th scope="row">' . esc_html__( 'Consent', 'duck-race' ) . '</th><td>';
         echo '<label><input type="checkbox" name="consent_duck_race" value="1" id="ms-consent-duck-race" /> ' . esc_html__( 'Future duck race communications', 'duck-race' ) . '</label><br />';
         echo '<label><input type="checkbox" name="consent_organisation" value="1" id="ms-consent-organisation" /> ' . esc_html__( 'Wider organisation communications', 'duck-race' ) . '</label>';
         echo '<p id="ms-consent-imported" style="display:none;margin:4px 0 0;font-size:12px;color:#555;">' . esc_html__( 'Consent settings imported from existing contact record — untick to change.', 'duck-race' ) . '</p>';
@@ -205,14 +214,38 @@ class ManualSalesPage {
     });
 })();
 
+// ── No email supplied: make email optional, hide consent, clear the field ──
+(function () {
+    var checkbox = document.getElementById("ms-no-email");
+    var emailEl = document.getElementById("email");
+    var consentRow = document.getElementById("ms-consent-row");
+    var noEmailNotice = document.getElementById("ms-no-email-notice");
+    var foundNotice = document.getElementById("ms-contact-found");
+    if (!checkbox || !emailEl || !consentRow) return;
+
+    checkbox.addEventListener("change", function () {
+        var checked = checkbox.checked;
+        emailEl.value = "";
+        emailEl.disabled = checked;
+        emailEl.required = !checked;
+        consentRow.style.display = checked ? "none" : "";
+        document.getElementById("ms-consent-duck-race").checked = false;
+        document.getElementById("ms-consent-organisation").checked = false;
+        if (noEmailNotice) noEmailNotice.style.display = checked ? "block" : "none";
+        if (foundNotice) foundNotice.style.display = "none";
+    });
+})();
+
 // ── Email look-up: pre-fill contact details when email is entered ──────────
 (function () {
     var emailEl   = document.getElementById("email");
     var noticeEl  = document.getElementById("ms-contact-found");
     var consentNoteEl = document.getElementById("ms-consent-imported");
+    var noEmailBox = document.getElementById("ms-no-email");
     if (!emailEl || !drCheckEmailUrl) return;
 
     emailEl.addEventListener("blur", function () {
+        if (noEmailBox && noEmailBox.checked) return;
         var email = emailEl.value.trim();
         if (!email) return;
 
@@ -298,23 +331,41 @@ class ManualSalesPage {
             $this->redirect_error( __( 'Invalid race.', 'duck-race' ) );
         }
 
-        $contact_id = ( new ContactService() )->upsert_by_email(
-            [
-                'email' => wp_unslash( $_POST['email'] ?? '' ),
-                'first_name' => wp_unslash( $_POST['first_name'] ?? '' ),
-                'last_name' => wp_unslash( $_POST['last_name'] ?? '' ),
-                'phone' => wp_unslash( $_POST['phone'] ?? '' ),
-                'address_line_1' => wp_unslash( $_POST['address_line_1'] ?? '' ),
-                'address_line_2' => wp_unslash( $_POST['address_line_2'] ?? '' ),
-                'city' => wp_unslash( $_POST['city'] ?? '' ),
-                'county' => wp_unslash( $_POST['county'] ?? '' ),
-                'postcode' => wp_unslash( $_POST['postcode'] ?? '' ),
-                'consent_duck_race' => ! empty( $_POST['consent_duck_race'] ),
-                'consent_organisation' => ! empty( $_POST['consent_organisation'] ),
-                'consent_source' => 'manual_sale_admin',
-                'consent_timestamp' => current_time( 'mysql', true ),
-            ]
-        );
+        $first_name = sanitize_text_field( wp_unslash( $_POST['first_name'] ?? '' ) );
+        $last_name = sanitize_text_field( wp_unslash( $_POST['last_name'] ?? '' ) );
+        if ( '' === $first_name || '' === $last_name ) {
+            $this->redirect_error( __( 'First name and last name are required.', 'duck-race' ) );
+        }
+
+        $no_email = ! empty( $_POST['no_email'] );
+        $contact_fields = [
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'phone' => wp_unslash( $_POST['phone'] ?? '' ),
+            'address_line_1' => wp_unslash( $_POST['address_line_1'] ?? '' ),
+            'address_line_2' => wp_unslash( $_POST['address_line_2'] ?? '' ),
+            'city' => wp_unslash( $_POST['city'] ?? '' ),
+            'county' => wp_unslash( $_POST['county'] ?? '' ),
+            'postcode' => wp_unslash( $_POST['postcode'] ?? '' ),
+        ];
+
+        $contact_service = new ContactService();
+        if ( $no_email ) {
+            $contact_id = $contact_service->create_without_email( $contact_fields );
+        } else {
+            $contact_id = $contact_service->upsert_by_email(
+                array_merge(
+                    $contact_fields,
+                    [
+                        'email' => wp_unslash( $_POST['email'] ?? '' ),
+                        'consent_duck_race' => ! empty( $_POST['consent_duck_race'] ),
+                        'consent_organisation' => ! empty( $_POST['consent_organisation'] ),
+                        'consent_source' => 'manual_sale_admin',
+                        'consent_timestamp' => current_time( 'mysql', true ),
+                    ]
+                )
+            );
+        }
         if ( $contact_id <= 0 ) {
             $this->redirect_error( __( 'Could not save contact.', 'duck-race' ) );
         }
@@ -363,6 +414,34 @@ class ManualSalesPage {
 
         wp_safe_redirect( add_query_arg( [ 'page' => 'duck-race-manual-sale', 'saved' => '1', 'purchase_id' => $purchase_id ], admin_url( 'admin.php' ) ) );
         exit;
+    }
+
+    /**
+     * If the purchase's contact has no email, return its display reference for
+     * the post-save success notice; empty string otherwise.
+     */
+    private function no_email_reference_for_purchase( int $purchase_id ): string {
+        if ( $purchase_id <= 0 ) {
+            return '';
+        }
+
+        global $wpdb;
+        $purchases_table = \DuckRace\Database\Schema::table_name( 'purchases' );
+        $contacts_table = \DuckRace\Database\Schema::table_name( 'contacts' );
+        $contact = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT c.id, c.email, c.created_at FROM {$purchases_table} p
+                 INNER JOIN {$contacts_table} c ON c.id = p.contact_id
+                 WHERE p.id = %d",
+                $purchase_id
+            )
+        );
+
+        if ( ! $contact || '' !== (string) $contact->email ) {
+            return '';
+        }
+
+        return ContactService::format_reference( (int) $contact->id, (string) $contact->created_at );
     }
 
     /**

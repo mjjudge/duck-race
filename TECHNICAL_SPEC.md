@@ -172,6 +172,7 @@ Rules:
 - The contacts table must enforce `UNIQUE(email)`
 - A new email address creates a new contact record
 - An existing email address updates the existing contact record
+- **Manual-sale-only exception**: if a manual (in-person/cash) sale is recorded and the seller could not obtain the buyer's email, `email` may be left NULL. No fake email is ever generated. The contact is identified instead by a reference derived from its ID (`MAN-YYYYMMDD-{id}`). Every such contact is created new — there is no matching/deduplication without an email. This does not apply to online purchases, which still require an email. If an email is added later and it belongs to an existing contact, the two are merged (purchases and duck entries move to the existing contact) rather than silently overwritten or blocked.
 - Contact changes such as surname, phone or address must preserve the audit trail rather than creating a duplicate contact
 
 Example:

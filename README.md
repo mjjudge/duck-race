@@ -30,7 +30,7 @@ Duck Race is built to be adopted by **any club or organisation**, not just the o
 | --- | --- |
 | **Races** | Create and manage multiple races per year, each with its own duck range, price, sales window, and status |
 | **Online sales** | Stripe Checkout integration — buyers choose a duck number, pay, and receive a confirmation email automatically |
-| **Manual sales** | Admin form for in-person or phone sales; same allocation rules as online |
+| **Manual sales** | Admin form for in-person or phone sales; same allocation rules as online. Buyer's email can be marked as unavailable (e.g. cash sale at an event) — the sale is still recorded and traceable, just without email confirmation |
 | **Duck grid** | Visual grid showing every duck tile — available, sold, reserved, winner. Click a tile to manage its status or reassign it to a different number |
 | **Contacts** | GDPR-aware contact database with separate duck-race consent and general marketing consent |
 | **Email** | Visual email editor (TinyMCE) with a placeholder picker and WordPress media library for all email templates |

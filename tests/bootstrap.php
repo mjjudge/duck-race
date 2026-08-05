@@ -65,3 +65,4 @@ require_once __DIR__ . '/../plugin/src/Services/DuckAllocationService.php';
 require_once __DIR__ . '/../plugin/src/Services/PurchaseService.php';
 require_once __DIR__ . '/../plugin/src/Services/StripeWebhookProcessor.php';
 require_once __DIR__ . '/../plugin/src/Services/RaceLifecycleService.php';
+require_once __DIR__ . '/../plugin/src/Services/ContactService.php';

@@ -112,6 +112,12 @@ When an existing contact submits updated information:
     • preserve audit history
     • do not create a new record
 One email address equals one contact record.
+Exception, manual sales only: if a seller could not obtain the buyer's email, the
+contact may be created with no email and no fake email is generated. It is
+identified by an internal reference instead. No deduplication is possible without
+an email, so every no-email manual sale creates a new contact record. This does
+not apply to online purchases. If an email is added later and collides with an
+existing contact, the two contacts are merged rather than silently overwritten.
 
 Race Authority
 The race database record is the authoritative source for:

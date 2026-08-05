@@ -258,6 +258,20 @@ Goal: Any club anywhere can install and run the plugin without touching code.
 | --- | --- | --- |
 | DR-190 | Reassign duck number from duck grid modal | P0 |
 
+### Phase 23 - Manual Sale Without Email
+
+Goal: Manual sales can be recorded when the seller was unable to obtain the buyer's email address, without weakening the email-as-contact-key model for every other purchase path.
+
+| ID | Item | Priority |
+| --- | --- | --- |
+| DR-230 | Make contacts.email nullable (migration) + document manual-only exception to email-as-identity-key | P1 |
+| DR-231 | Add "No email address supplied" checkbox to manual sale form | P1 |
+| DR-232 | Generate internal purchaser reference for no-email contacts | P1 |
+| DR-233 | Guard EmailService/confirmation flow against contacts with no email | P1 |
+| DR-234 | Show "No email supplied" + internal reference across contact/purchase/reporting UI | P1 |
+| DR-235 | Allow adding email to a no-email purchaser later, with merge flow on collision | P1 |
+| DR-236 | Tests for no-email manual sale, later email-add, merge collision, and reporting | P1 |
+
 ## Delivery Principle
 
 Build the full v1.1 vision progressively. MVP is not a separate reduced product; it is the point in the backlog where the system is usable for a real duck race.
@@ -1435,3 +1449,108 @@ Acceptance Criteria
     • No analytics, no cookies, no external requests automatically.
 Dependencies
 DR-220.
+
+EPIC 23 — Manual Sale Without Email
+
+Background
+Some manual (cash/in-person) sales happen where the seller could not obtain the buyer's email address. Today the manual sale form requires an email because contact identity is keyed on `UNIQUE(email)` (see "Email Address Is The Contact Key" in MEMORY.md, TECHNICAL_SPEC.md §2.6, and AGENTS.md "Contact Authority"). This epic adds a scoped, manual-sale-only exception: email becomes optional when the seller genuinely couldn't get one, and the purchaser is instead identified by a stable internal reference. It does not change identity rules for online purchases, and does not weaken deduplication for any purchaser who does have an email.
+
+Decisions confirmed with the club (2026-08-05):
+    • Every no-email manual sale creates a new purchaser record — there is no fuzzy/name-based matching to link repeat no-email buyers. If the same person is recognised as a repeat buyer, that's only possible once an email is on file.
+    • First and last name remain mandatory even when no email is supplied — no fully anonymous "name-optional" sales.
+    • Consent checkboxes (future duck race / organisation communications) are hidden on the form when "No email address supplied" is checked, since there's no channel to act on consent. They reappear if an email is added later.
+    • When an admin later adds an email to a no-email purchaser and that email already belongs to a different existing contact, the system offers a merge flow rather than blocking or silently duplicating.
+
+DR-230 — Make contacts.email nullable + document the exception
+Description
+Alter the contacts table so `email` can be NULL, keeping `UNIQUE(email)` (MySQL treats multiple NULLs as distinct, so this doesn't reintroduce duplicate-email risk for contacts that do have one). Update TECHNICAL_SPEC.md §2.6, AGENTS.md "Contact Authority", and MEMORY.md "Email Address Is The Contact Key" to state the manual-sale-only exception explicitly, so this isn't read as a silent contradiction of the golden-record rule.
+Status
+    • [x] Complete — verified in a local WordPress install.
+Acceptance Criteria
+    • Migration is versioned and idempotent per existing migration conventions; plugin version bumped per CLAUDE.md §8.
+    • Existing rows are unaffected; no existing email is nulled or altered.
+    • `UNIQUE(email)` constraint is retained.
+    • TECHNICAL_SPEC.md, AGENTS.md and MEMORY.md each gain a short note scoping the no-email exception to manual sales only; the "one email = one contact" rule remains stated as the default for every other path.
+Dependencies
+None.
+
+DR-231 — Add "No email address supplied" checkbox to manual sale form
+Description
+On the manual sale admin form, add a checkbox that, when checked, makes the email field optional, hides the consent checkboxes, and clearly labels the record as having no email.
+Status
+    • [x] Complete — verified in a local WordPress install.
+Acceptance Criteria
+    • Unchecked (default): current behaviour is fully unchanged — email required, contact matched/upserted by email, consent fields shown.
+    • Checked: email input becomes optional and is cleared/disabled; consent checkboxes are hidden; first/last name remain required.
+    • Checked: the email-lookup "existing contact found" prefill behaviour is skipped (there is no email to look up).
+    • Form clearly displays "No email supplied" state before submit, and the saved record reflects it consistently in the admin UI afterward.
+    • No fake/placeholder email address is ever generated or stored.
+Dependencies
+DR-230.
+
+DR-232 — Generate internal purchaser reference for no-email contacts
+Description
+When a manual sale is saved with no email, create a new contact record (never matched against an existing one) with a stable, collision-resistant internal reference, e.g. `MAN-20260805-8F3A91`, and link that purchaser to their purchase and all duck entries in that transaction via the existing contact_id/purchase_id relationships.
+Status
+    • [x] Complete — verified in a local WordPress install.
+Acceptance Criteria
+    • A new contact row is always created for a no-email manual sale — no matching against existing contacts.
+    • Reference is generated deterministically or with a collision check before save; uniqueness is enforced.
+    • Reference links purchaser, purchase and all duck entries from that single transaction (multiple ducks bought together in one manual sale form submission remain one purchase, as today).
+    • Audit log entry for `contact.created` records that this contact was created via the no-email manual path.
+Dependencies
+DR-230, DR-231.
+
+DR-233 — Guard EmailService against contacts with no email
+Description
+`EmailService::send_purchase_confirmation()` currently builds a mail with `'to' => (string) $context['email']` with no guard against an empty value. For no-email purchases, no confirmation email should be attempted at all, and this must not be silently swallowed as a failed send.
+Status
+    • [x] Complete — verified in a local WordPress install.
+Acceptance Criteria
+    • `send_purchase_confirmation()` (and any other mail-sending path that reads a purchase's contact email) returns/skips cleanly when the contact has no email, without calling the mailer.
+    • No entry is written to the email log implying a send was attempted or failed; the skip is distinguishable from a real failure.
+    • `purchase_source = manual` sales with no email still record `paid_at` and financial fields exactly as today — only the email step is skipped.
+Dependencies
+DR-230.
+
+DR-234 — Show "No email supplied" + internal reference across UI
+Description
+Everywhere a contact's email is currently displayed (contact list, contact edit page, purchase lists, reporting pages/exports, duck detail modal), show "No email supplied" and the internal reference instead of a blank cell.
+Status
+    • [x] Complete — verified in a local WordPress install.
+Acceptance Criteria
+    • Contact list and contact edit page show "No email supplied" and the internal reference for no-email contacts.
+    • Reporting pages and CSV exports render "No email supplied" rather than an empty/blank value, and do not error on NULL email.
+    • Duck grid detail modal and purchase views show the internal reference for no-email purchasers.
+    • No-email contacts are excluded from any bulk-email or marketing-export feature (nothing to send to).
+Dependencies
+DR-230, DR-232.
+
+DR-235 — Allow adding email to a no-email purchaser later, with merge on collision
+Description
+From the contact edit page, an admin can add an email address to a previously no-email purchaser. If that email doesn't match any existing contact, it simply becomes the contact's email going forward (identical to editing any other contact field) and future communications can be enabled per normal consent rules. If the email already belongs to a different existing contact, offer an explicit, audited merge: reassign the no-email contact's purchases and duck entries onto the existing contact, then remove the now-empty duplicate.
+Status
+    • [x] Complete — verified in a local WordPress install.
+Acceptance Criteria
+    • Adding a genuinely new email to a no-email contact behaves like any other contact edit: updates the record, preserves audit history, no duplicate created.
+    • Adding an email that collides with an existing contact does not silently overwrite or duplicate either record; admin is shown both records and must explicitly confirm the merge.
+    • Confirmed merge reassigns `purchases.contact_id` and `entries.contact_id` from the no-email contact to the existing contact, preserves all financial and duck-ownership history, and is written to the audit log as a distinct `contact.merged` event with before/after state for both records.
+    • The internal reference from the no-email record is retained (e.g. in admin notes or audit log) so the original manual-sale transaction remains traceable after merge.
+    • Merge is only reachable by a capability-checked, nonce-protected admin action, consistent with CLAUDE.md §6.
+Dependencies
+DR-232, DR-234.
+
+DR-236 — Tests for no-email manual sale flow
+Description
+Cover the new behaviour with unit/integration tests, per CLAUDE.md §9 priorities (contact dedup/update behaviour, financial integrity, auditability).
+Status
+    • [x] Complete — verified in a local WordPress install.
+Acceptance Criteria
+    • Manual sale with email: existing behaviour is unchanged (regression coverage).
+    • Manual sale with no email: contact created with NULL email and internal reference, no confirmation email attempted, purchase and entries correctly linked.
+    • Two separate no-email manual sales never get merged/matched automatically.
+    • Adding a non-colliding email to a no-email contact updates it in place with audit history preserved.
+    • Adding a colliding email triggers the merge path and correctly reassigns purchases/entries with an audit trail; no duck entry or financial record is lost or duplicated.
+    • Reporting/export queries do not error and render "No email supplied" for NULL-email contacts.
+Dependencies
+DR-231, DR-232, DR-233, DR-235.

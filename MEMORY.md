@@ -53,6 +53,14 @@ When an existing email address is used:
     • update the existing contact
     • do not create a duplicate contact
     • preserve audit history
+Manual-sale-only exception (added 2026-08-05, EPIC 23):
+If a manual/in-person seller could not obtain the buyer's email, email may be
+left NULL rather than faked. The contact is identified by a reference derived
+from its own ID (MAN-YYYYMMDD-{id}) instead. No deduplication is attempted —
+every no-email manual sale creates a new contact. Online purchases are
+unaffected and still require an email. If an email is added later and it
+belongs to an existing contact, the two are merged (purchases/duck entries
+reassigned, audit-logged as contact.merged) rather than overwritten or blocked.
 Example:
 Mary Smith
 mary@example.com

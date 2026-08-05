@@ -84,7 +84,10 @@ class RefundPage {
 
                 echo '<tr>';
                 echo '<td>' . esc_html( (string) $row->id ) . '</td>';
-                echo '<td>' . $buyer . '<br><small>' . esc_html( $row->email ) . '</small></td>';
+                $email_display = '' !== (string) $row->email
+                    ? (string) $row->email
+                    : \DuckRace\Services\ContactService::no_email_display( (int) $row->contact_id, (string) $row->contact_created_at );
+                echo '<td>' . $buyer . '<br><small>' . esc_html( $email_display ) . '</small></td>';
                 echo '<td>' . esc_html( (string) ( $row->duck_numbers ?: '—' ) ) . '</td>';
                 echo '<td>' . esc_html( $amount ) . '</td>';
                 echo '<td>' . esc_html( $source ) . '</td>';

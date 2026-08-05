@@ -7,12 +7,14 @@ require_once __DIR__ . '/Unit/AllocationServiceTest.php';
 require_once __DIR__ . '/Unit/StripeWebhookProcessorTest.php';
 require_once __DIR__ . '/Unit/RaceLifecycleServiceTest.php';
 require_once __DIR__ . '/Unit/DuckAllocationValidationTest.php';
+require_once __DIR__ . '/Unit/ContactReferenceTest.php';
 
 $tests = [
     'AllocationServiceTest'        => [ \DuckRace\Tests\Unit\AllocationServiceTest::class, 'run' ],
     'StripeWebhookProcessorTest'   => [ \DuckRace\Tests\Unit\StripeWebhookProcessorTest::class, 'run' ],
     'RaceLifecycleServiceTest'     => [ \DuckRace\Tests\Unit\RaceLifecycleServiceTest::class, 'run' ],
     'DuckAllocationValidationTest' => [ \DuckRace\Tests\Unit\DuckAllocationValidationTest::class, 'run' ],
+    'ContactReferenceTest'         => [ \DuckRace\Tests\Unit\ContactReferenceTest::class, 'run' ],
 ];
 
 $failed = 0;

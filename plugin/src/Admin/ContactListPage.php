@@ -49,7 +49,10 @@ class ContactListPage {
 
                 echo '<tr>';
                 echo '<td>' . esc_html( $name ) . '</td>';
-                echo '<td>' . esc_html( (string) $row->email ) . '</td>';
+                $email_display = '' !== (string) $row->email
+                    ? (string) $row->email
+                    : \DuckRace\Services\ContactService::no_email_display( (int) $row->id, (string) $row->created_at );
+                echo '<td>' . esc_html( $email_display ) . '</td>';
                 echo '<td>' . esc_html( (string) $row->organisation_name ) . '</td>';
                 echo '<td>' . esc_html( $consent ) . '</td>';
                 echo '<td>' . esc_html( (string) $row->purchase_count ) . '</td>';
@@ -94,7 +97,7 @@ class ContactListPage {
         }
 
         $sql = "
-            SELECT c.id, c.first_name, c.last_name, c.email, c.organisation_name,
+            SELECT c.id, c.first_name, c.last_name, c.email, c.organisation_name, c.created_at,
                 c.consent_duck_race, c.consent_organisation,
                 {$purchase_select}
             FROM {$contacts_table} c

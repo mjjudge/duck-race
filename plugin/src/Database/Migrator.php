@@ -27,6 +27,7 @@ class Migrator {
         '1.2.0' => Migrations\AddImageToRaces::class,
         '1.3.0' => Migrations\AddGiftAidToPurchases::class,
         '1.4.0' => Migrations\AddRefundColumnsToPurchases::class,
+        '1.5.0' => Migrations\AddNullableEmailToContacts::class,
     ];
 
     public function run(): void {

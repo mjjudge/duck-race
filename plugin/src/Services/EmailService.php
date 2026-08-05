@@ -20,6 +20,11 @@ class EmailService {
             return true;
         }
 
+        if ( '' === (string) $context['email'] ) {
+            // No email on file for this purchaser (no-email manual sale) — nothing to send.
+            return true;
+        }
+
         $renderer = new TemplateRenderer();
         $subject = $renderer->render_subject( 'purchase_confirmation', $context );
         $body = $renderer->render_body( 'purchase_confirmation', $context );
@@ -48,6 +53,11 @@ class EmailService {
         $context = $this->purchase_context( $purchase_id );
         if ( null === $context ) {
             return false;
+        }
+
+        if ( '' === (string) $context['email'] ) {
+            // No email on file for this purchaser (no-email manual sale) — nothing to send.
+            return true;
         }
 
         $duck_settings            = get_option( 'duck_race_settings', [] );
@@ -89,6 +99,7 @@ class EmailService {
                  FROM {$contact_table} c
                  INNER JOIN {$purchase_table} p ON p.contact_id = c.id
                  WHERE p.race_id = %d AND p.payment_status = 'paid'
+                   AND c.email IS NOT NULL AND c.email <> ''
                  GROUP BY c.id, c.first_name, c.last_name, c.email",
                 $race_id
             ),

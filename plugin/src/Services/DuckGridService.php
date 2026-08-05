@@ -83,7 +83,7 @@ class DuckGridService {
                 'prize_label' => is_array( $entry ) ? (string) ( $entry['prize_label'] ?? '' ) : '',
                 'contact_name' => is_array( $entry ) ? trim( (string) ( $entry['first_name'] ?? '' ) . ' ' . (string) ( $entry['last_name'] ?? '' ) ) : '',
                 'organisation_name' => is_array( $entry ) ? (string) ( $entry['organisation_name'] ?? '' ) : '',
-                'contact_email' => is_array( $entry ) ? (string) ( $entry['email'] ?? '' ) : '',
+                'contact_email' => $this->contact_email_display( $entry ),
                 'contact_phone' => is_array( $entry ) ? (string) ( $entry['phone'] ?? '' ) : '',
                 'has_comment' => is_array( $state ) && '' !== (string) ( $state['comment'] ?? '' ),
                 'duck_comment' => is_array( $state ) ? (string) ( $state['comment'] ?? '' ) : '',
@@ -280,6 +280,7 @@ class DuckGridService {
             $wpdb->prepare(
                 "SELECT e.duck_number, e.duck_name, e.entry_status, e.purchase_id, e.winner_position, e.prize_label,
                         p.payment_status, p.purchase_source,
+                        c.id AS contact_id, c.created_at AS contact_created_at,
                         c.first_name, c.last_name, c.organisation_name, c.email, c.phone
                  FROM {$entries} e
                  LEFT JOIN {$purchases} p ON p.id = e.purchase_id
@@ -307,6 +308,22 @@ class DuckGridService {
         }
 
         return $map;
+    }
+
+    /**
+     * @param array<string, mixed>|null $entry
+     */
+    private function contact_email_display( ?array $entry ): string {
+        if ( ! is_array( $entry ) || empty( $entry['contact_id'] ) ) {
+            return '';
+        }
+
+        $email = (string) ( $entry['email'] ?? '' );
+        if ( '' !== $email ) {
+            return $email;
+        }
+
+        return \DuckRace\Services\ContactService::no_email_display( (int) $entry['contact_id'], (string) ( $entry['contact_created_at'] ?? '' ) );
     }
 
     /**

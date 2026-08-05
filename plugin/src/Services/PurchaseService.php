@@ -213,7 +213,7 @@ class PurchaseService {
 
         return $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT p.*, c.first_name, c.last_name, c.email,
+                "SELECT p.*, c.first_name, c.last_name, c.email, c.created_at AS contact_created_at,
                         GROUP_CONCAT(e.duck_number ORDER BY e.duck_number ASC SEPARATOR ', ') AS duck_numbers
                  FROM {$purchases_table} p
                  LEFT JOIN {$contacts_table} c ON c.id = p.contact_id
